@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
@@ -28,3 +29,6 @@ Categories and products currently persist in this browser's `localStorage`, incl
 =======
 # mithai-namkeen-digital-menu
 >>>>>>> 8929a18253c0e2e0805908062df2348fc4f9e2ba
+=======
+
+>>>>>>> 2850cdabf9f703d4d382afbdff3199cdcc4c6b4d
