@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+
+  --color-ink: #140c08;
+  --color-ink-soft: #24160f;
+  --color-gold: #c4a35a;
+  --color-gold-light: #e8d5a3;
+  --color-gold-deep: #8d6b2b;
+  --color-cream: #f4eee4;
+  --color-parchment: #ebe2d2;
+  --color-ivory: #fbf7f0;
+  --color-line: #ddcfb6;
+  --color-muted: #7a6850;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: #f4eee4;
+  color: #140c08;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: #c4a35a;
+  color: #140c08;
+}
+
+.luxury-grain {
+  position: relative;
+}
+
+.luxury-grain::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.18;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  z-index: 0;
+}
+
+.gold-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c4a35a, transparent);
+}
+
+.gold-frame {
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(196, 163, 90, 0.35),
+    inset 0 0 0 6px rgba(251, 247, 240, 0.55);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float {
+  animation: float-soft 5.5s ease-in-out infinite;
+}
+
+.gold-text {
+  background: linear-gradient(120deg, #8d6b2b, #e8d5a3, #c4a35a, #f3e6c0);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.input-luxury {
+  @apply w-full px-3.5 py-2.5 rounded-xl border border-line bg-ivory text-sm text-ink placeholder:text-muted/60 focus:outline-none focus:ring-2 focus:ring-gold/50 focus:border-gold transition;
+}
+
+.btn-gold {
+  @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-ink text-gold-light text-xs font-semibold tracking-wide hover:bg-black transition shadow-[0_10px_30px_rgba(20,12,8,0.18)];
+}
+
+.btn-outline-gold {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full border border-gold/40 bg-ivory/80 text-xs font-semibold text-gold-deep hover:bg-gold-light/40 transition;
+}
+
+.card-luxury {
+  @apply bg-ivory/90 border border-line rounded-[1.5rem] shadow-[0_20px_50px_rgba(20,12,8,0.06)];
+}
