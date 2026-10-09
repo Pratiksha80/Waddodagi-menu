@@ -3,25 +3,20 @@ import {
   LayoutDashboard,
   FolderTree,
   ShoppingBag,
+  BookOpen,
   PlusCircle,
-  QrCode,
   ExternalLink,
-  LogOut,
-  Database
+  LogOut
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAuth } from '../../context/AuthContext';
 
 interface AdminSidebarProps {
-  onOpenQrModal: () => void;
-  onOpenSupabaseGuide: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
 }
 
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({
-  onOpenQrModal,
-  onOpenSupabaseGuide,
   isMobileOpen = false,
   onCloseMobile,
 }) => {
@@ -82,23 +77,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         })}
 
         <div className="pt-6 px-3 pb-2 text-[10px] font-semibold tracking-[0.2em] text-gold/50 uppercase">
-          Tools
+          Menu
         </div>
 
         <button
-          onClick={onOpenQrModal}
+          onClick={() => handleNavigate('/menu')}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-sm text-ivory/75 hover:bg-white/5 hover:text-ivory transition-all text-left"
         >
-          <QrCode className="w-4 h-4 text-gold shrink-0" />
-          QR standee
-        </button>
-
-        <button
-          onClick={onOpenSupabaseGuide}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-full text-sm text-ivory/75 hover:bg-white/5 hover:text-ivory transition-all text-left"
-        >
-          <Database className="w-4 h-4 text-gold shrink-0" />
-          Supabase schema
+          <BookOpen className="w-4 h-4 text-gold shrink-0" />
+          Menu
         </button>
 
       </div>

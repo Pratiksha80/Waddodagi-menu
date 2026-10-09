@@ -59,7 +59,7 @@ const AppRouter: React.FC = () => {
 
   return (
     <div className="relative min-h-screen">
-      {import.meta.env.DEV && <DevModeSwitchBar />}
+      {import.meta.env.DEV && path.startsWith('/admin') && <DevModeSwitchBar />}
       {renderRoute()}
     </div>
   );
@@ -70,7 +70,6 @@ const DevModeSwitchBar: React.FC = () => {
   const { isAuthenticated } = useAuth();
 
   const isCustomerView = !path.startsWith('/admin');
-  const isQrGuest = new URLSearchParams(window.location.search).get('source') === 'qr' && !isAuthenticated;
 
   return (
     <div className="bg-ink text-gold-light/80 text-[11px] px-3 py-1.5 flex items-center justify-between border-b border-gold/20 z-40 relative select-none">
@@ -92,18 +91,16 @@ const DevModeSwitchBar: React.FC = () => {
         >
           Menu
         </button>
-        {!isQrGuest && (
-          <button
-            onClick={() => navigate(isAuthenticated ? '/admin/dashboard' : '/admin/login')}
-            className={`px-2.5 py-0.5 rounded-full transition ${
-              !isCustomerView
-                ? 'bg-gold text-ink font-semibold'
-                : 'text-gold-light/70 hover:text-ivory hover:bg-white/10'
-            }`}
-          >
-            Owner
-          </button>
-        )}
+        <button
+          onClick={() => navigate(isAuthenticated ? '/admin/dashboard' : '/admin/login')}
+          className={`px-2.5 py-0.5 rounded-full transition ${
+            !isCustomerView
+              ? 'bg-gold text-ink font-semibold'
+              : 'text-gold-light/70 hover:text-ivory hover:bg-white/10'
+          }`}
+        >
+          Owner
+        </button>
       </div>
     </div>
   );

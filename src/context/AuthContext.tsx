@@ -49,11 +49,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (
-      cleanEmail !== OWNER_DEFAULT_CREDENTIALS.email.toLowerCase() ||
-      password !== OWNER_DEFAULT_CREDENTIALS.password
-    ) {
+    const cleanEmail = email.trim();
+    if (cleanEmail !== OWNER_DEFAULT_CREDENTIALS.email) {
+      return {
+        success: false,
+        error: 'Invalid email.',
+      };
+    }
+
+    if (password !== OWNER_DEFAULT_CREDENTIALS.password) {
       return {
         success: false,
         error: 'Invalid email or password.',

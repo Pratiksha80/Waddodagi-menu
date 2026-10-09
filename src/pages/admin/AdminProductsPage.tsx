@@ -26,6 +26,8 @@ export const AdminProductsPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
 
   // Map category id to name
   const categoryMap = useMemo(() => {
@@ -67,6 +69,42 @@ export const AdminProductsPage: React.FC = () => {
     await deleteProduct(deletingProduct.id);
     showToast(`Menu item "${deletingProduct.name}" deleted`, 'info');
     setDeletingProduct(null);
+  };
+
+  const visibleProductIds = filteredProducts.map((product) => product.id);
+  const allVisibleSelected = visibleProductIds.length > 0 && visibleProductIds.every((id) => selectedProductIds.includes(id));
+
+  const toggleProductSelection = (id: string) => {
+    setSelectedProductIds((selected) => selected.includes(id)
+      ? selected.filter((selectedId) => selectedId !== id)
+      : [...selected, id]);
+  };
+
+  const toggleVisibleSelection = () => {
+    setSelectedProductIds((selected) => allVisibleSelected
+      ? selected.filter((id) => !visibleProductIds.includes(id))
+      : [...new Set([...selected, ...visibleProductIds])]);
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedProducts = products.filter((product) => selectedProductIds.includes(product.id));
+    let deletedCount = 0;
+    const failedIds: string[] = [];
+
+    for (const product of selectedProducts) {
+      try {
+        await deleteProduct(product.id);
+        deletedCount += 1;
+      } catch {
+        failedIds.push(product.id);
+      }
+    }
+
+    setSelectedProductIds(failedIds);
+    setIsBulkDeleteOpen(false);
+    if (deletedCount > 0) {
+      showToast(`Deleted ${deletedCount} menu item${deletedCount === 1 ? '' : 's'}${failedIds.length ? `; ${failedIds.length} could not be deleted` : ''}.`, failedIds.length ? 'info' : 'success');
+    }
   };
 
   return (
@@ -132,22 +170,33 @@ export const AdminProductsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-xs text-[#745b00] pt-1">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#745b00] pt-1">
             <span>
               Showing {filteredProducts.length} of {products.length} menu items
             </span>
-            {(selectedCategory !== 'all' || selectedStatus !== 'all' || searchTerm) && (
-              <button
-                onClick={() => {
-                  setSelectedCategory('all');
-                  setSelectedStatus('all');
-                  setSearchTerm('');
-                }}
-                className="font-bold underline text-[#241a00]"
-              >
-                Reset Filters
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {selectedProductIds.length > 0 && (
+                <button
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 font-semibold text-white transition hover:bg-rose-700"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete selected ({selectedProductIds.length})
+                </button>
+              )}
+              {(selectedCategory !== 'all' || selectedStatus !== 'all' || searchTerm) && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setSelectedStatus('all');
+                    setSearchTerm('');
+                  }}
+                  className="font-bold underline text-[#241a00]"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -203,7 +252,18 @@ export const AdminProductsPage: React.FC = () => {
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-[#ffecc2] border-b border-[#e5d8b8] text-[11px] font-bold text-[#241a00] uppercase tracking-wider">
-                    <th className="py-3.5 px-4 sm:px-6">Menu Item</th>
+                    <th className="py-3.5 px-4 sm:px-6">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={toggleVisibleSelection}
+                          aria-label="Select all visible menu items"
+                          className="h-4 w-4 accent-[#a97705]"
+                        />
+                        <span>Menu Item</span>
+                      </div>
+                    </th>
                     <th className="py-3.5 px-4">Category</th>
                     <th className="py-3.5 px-4">Price</th>
                     <th className="py-3.5 px-4">Status</th>
@@ -220,6 +280,13 @@ export const AdminProductsPage: React.FC = () => {
                         {/* Name and Image */}
                         <td className="py-3.5 px-4 sm:px-6">
                           <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedProductIds.includes(prod.id)}
+                              onChange={() => toggleProductSelection(prod.id)}
+                              aria-label={`Select ${prod.name}`}
+                              className="h-4 w-4 shrink-0 accent-[#a97705]"
+                            />
                             <div className="w-12 h-12 rounded-lg bg-stone-100 border border-[#ccc7aa]/60 shrink-0 overflow-hidden flex items-center justify-center">
                               {prod.image_url ? (
                                 <img
@@ -319,6 +386,14 @@ export const AdminProductsPage: React.FC = () => {
         message="This menu item will be permanently removed from the database and customer menu."
         onClose={() => setDeletingProduct(null)}
         onConfirm={handleConfirmDelete}
+      />
+
+      <DeleteConfirmModal
+        isOpen={isBulkDeleteOpen}
+        title={`Delete ${selectedProductIds.length} selected menu item${selectedProductIds.length === 1 ? '' : 's'}?`}
+        message="These menu items will be permanently removed from the database and customer menu."
+        onClose={() => setIsBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
       />
     </AdminLayout>
   );

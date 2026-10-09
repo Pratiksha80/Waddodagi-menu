@@ -7,8 +7,7 @@ import {
   Plus, 
   CheckCircle2, 
   AlertCircle,
-  Loader2,
-  Sparkles
+  Loader2
 } from 'lucide-react';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { useMenu } from '../../context/MenuContext';
@@ -32,14 +31,6 @@ export const AdminProductAddPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-
-  // Suggested curated sweet/snack royalty-free food images helper
-  const samplePresets = [
-    { label: 'Traditional Sweets', url: 'https://images.unsplash.com/photo-1599488615731-7e5c2823ff28?w=500&auto=format&fit=crop&q=80' },
-    { label: 'Crispy Savoury', url: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=500&auto=format&fit=crop&q=80' },
-    { label: 'Pastry / Bakery', url: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500&auto=format&fit=crop&q=80' },
-    { label: 'Hot Beverage', url: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=500&auto=format&fit=crop&q=80' },
-  ];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -297,34 +288,6 @@ export const AdminProductAddPage: React.FC = () => {
                       className="hidden"
                     />
                   </label>
-                </div>
-              </div>
-
-              {/* Curated quick photo presets */}
-              <div>
-                <span className="text-[11px] font-semibold text-[#745b00] block mb-1">
-                  Or pick a royalty-free placeholder image:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {samplePresets.map((preset) => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setImageUrl(preset.url)}
-                      className="text-[11px] px-2.5 py-1 bg-white border border-[#ccc7aa] hover:bg-[#ffecc2] text-[#241a00] rounded-md transition"
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                  {imageUrl && (
-                    <button
-                      type="button"
-                      onClick={() => setImageUrl('')}
-                      className="text-[11px] px-2.5 py-1 text-red-600 hover:underline"
-                    >
-                      Clear image
-                    </button>
-                  )}
                 </div>
               </div>
 

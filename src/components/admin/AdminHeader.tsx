@@ -1,11 +1,11 @@
 import React from 'react';
-import { Menu as MenuIcon, QrCode } from 'lucide-react';
+import { Menu as MenuIcon, BookOpen } from 'lucide-react';
+import { useNavigation } from '../../context/NavigationContext';
 
 interface AdminHeaderProps {
   title: string;
   subtitle?: string;
   onOpenMobileMenu: () => void;
-  onOpenQrModal: () => void;
   actionButton?: React.ReactNode;
 }
 
@@ -13,9 +13,10 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   title,
   subtitle,
   onOpenMobileMenu,
-  onOpenQrModal,
   actionButton,
 }) => {
+  const { navigate } = useNavigation();
+
   return (
     <header className="sticky top-0 z-30 bg-cream/90 backdrop-blur-xl border-b border-line px-4 sm:px-8 py-5">
       <div className="flex items-center justify-between gap-4">
@@ -41,11 +42,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
         <div className="flex items-center gap-2 sm:gap-3">
           <button
-            onClick={onOpenQrModal}
+            onClick={() => navigate('/menu')}
             className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-gold/35 bg-ivory hover:bg-parchment text-xs font-semibold text-gold-deep transition"
           >
-            <QrCode className="w-4 h-4" />
-            QR standee
+            <BookOpen className="w-4 h-4" />
+            Menu
           </button>
 
           {actionButton}

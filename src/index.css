@@ -3,6 +3,7 @@
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-price: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --color-ink: #140c08;
   --color-ink-soft: #24160f;

@@ -1,14 +1,8 @@
 import React from 'react';
-import { Clock, ShieldCheck, LogIn, Leaf } from 'lucide-react';
-import { useNavigation } from '../../context/NavigationContext';
-import { useAuth } from '../../context/AuthContext';
+import { Clock, ShieldCheck, Leaf } from 'lucide-react';
 import { GoldFlourish } from '../common/GoldFlourish';
 
 export const EmptyMenuState: React.FC = () => {
-  const { navigate } = useNavigation();
-  const { isAuthenticated } = useAuth();
-  const isQrGuest = new URLSearchParams(window.location.search).get('source') === 'qr' && !isAuthenticated;
-
   return (
     <div className="px-4 sm:px-8 py-12 sm:py-16 max-w-3xl mx-auto text-center">
       <GoldFlourish className="w-40 mb-6 mx-auto" />
@@ -39,15 +33,6 @@ export const EmptyMenuState: React.FC = () => {
         </div>
       </div>
 
-      {!isQrGuest && (
-        <button
-          onClick={() => navigate(isAuthenticated ? '/admin/dashboard' : '/admin/login')}
-          className="mt-10 btn-outline-gold"
-        >
-          <LogIn className="w-3.5 h-3.5" />
-          {isAuthenticated ? 'Manage menu' : 'Shop owner? Sign in to publish the menu'}
-        </button>
-      )}
     </div>
   );
 };

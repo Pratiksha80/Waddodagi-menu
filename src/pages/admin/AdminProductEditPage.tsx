@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Upload, 
+  Camera,
   Trash2, 
   CheckCircle2, 
   AlertCircle,
@@ -259,7 +260,7 @@ export const AdminProductEditPage: React.FC = () => {
                 Menu Item Image (Upload or Web URL)
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                <div className="sm:col-span-8">
+                <div className="sm:col-span-6">
                   <input
                     type="url"
                     value={imageUrl}
@@ -268,7 +269,20 @@ export const AdminProductEditPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#ccc7aa] bg-white text-xs sm:text-sm text-[#241a00] focus:outline-none focus:ring-2 focus:ring-[#fdec00]"
                   />
                 </div>
-                <div className="sm:col-span-4">
+                <div className="sm:col-span-3">
+                  <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-[#ccc7aa] bg-white hover:bg-[#ffecc2] text-xs font-bold text-[#4a4731] cursor-pointer transition shadow-2xs">
+                    <Camera className="w-4 h-4 text-[#745b00]" />
+                    <span>Capture Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <div className="sm:col-span-3">
                   <label className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border border-[#ccc7aa] bg-white hover:bg-[#ffecc2] text-xs font-bold text-[#4a4731] cursor-pointer transition shadow-2xs">
                     <Upload className="w-4 h-4 text-[#745b00]" />
                     <span>Change File</span>

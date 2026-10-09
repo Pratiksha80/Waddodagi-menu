@@ -71,7 +71,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, categoryName 
         <div className="mt-4 pt-4 border-t border-line flex items-end justify-between">
           <div>
             <span className="text-[10px] uppercase tracking-[0.18em] text-gold-deep font-medium">From</span>
-            <p className="font-serif text-2xl text-ink leading-none mt-0.5">
+            <p className="font-price text-2xl text-ink leading-none mt-0.5">
               ₹{product.price.toFixed(0)}
             </p>
           </div>

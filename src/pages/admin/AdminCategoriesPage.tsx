@@ -25,6 +25,9 @@ export const AdminCategoriesPage: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
 
   // Calculate count of products per category
   const categoriesWithCounts = useMemo(() => {
@@ -75,6 +78,51 @@ export const AdminCategoriesPage: React.FC = () => {
     }
   };
 
+  const visibleIds = filteredCategories.map((category) => category.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedCategoryIds.includes(id));
+
+  const toggleCategorySelection = (id: string) => {
+    setSelectedCategoryIds((selected) => selected.includes(id)
+      ? selected.filter((selectedId) => selectedId !== id)
+      : [...selected, id]);
+  };
+
+  const toggleVisibleSelection = () => {
+    setSelectedCategoryIds((selected) => allVisibleSelected
+      ? selected.filter((id) => !visibleIds.includes(id))
+      : [...new Set([...selected, ...visibleIds])]);
+  };
+
+  const handleBulkDelete = async () => {
+    const selectedCategories = categoriesWithCounts.filter((category) => selectedCategoryIds.includes(category.id));
+    const deletable = selectedCategories.filter((category) => category.product_count === 0);
+    const blocked = selectedCategories.length - deletable.length;
+    setBulkDeleteError(null);
+
+    if (deletable.length === 0) {
+      setBulkDeleteError('None of the selected categories can be deleted because they contain menu items.');
+      return;
+    }
+
+    let deletedCount = 0;
+    const failedIds: string[] = [];
+    for (const category of deletable) {
+      try {
+        await deleteCategory(category.id);
+        deletedCount += 1;
+      } catch {
+        failedIds.push(category.id);
+      }
+    }
+
+    const remainingIds = [...selectedCategories.filter((category) => category.product_count > 0).map((category) => category.id), ...failedIds];
+    setSelectedCategoryIds(remainingIds);
+    setIsBulkDeleteOpen(false);
+    if (deletedCount > 0) {
+      showToast(`Deleted ${deletedCount} categor${deletedCount === 1 ? 'y' : 'ies'}${blocked + failedIds.length ? `; ${blocked + failedIds.length} could not be deleted` : ''}.`, blocked + failedIds.length ? 'info' : 'success');
+    }
+  };
+
   return (
     <AdminLayout
       title="Categories"
@@ -103,8 +151,20 @@ export const AdminCategoriesPage: React.FC = () => {
               className="w-full pl-9 pr-4 py-2 rounded-lg border border-[#ccc7aa] bg-white text-xs sm:text-sm text-[#241a00] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#fdec00] disabled:bg-stone-100 disabled:cursor-not-allowed"
             />
           </div>
-          <div className="text-xs font-semibold text-[#745b00] flex items-center justify-end">
-            Showing {filteredCategories.length} of {categories.length} categories
+          <div className="flex items-center justify-between sm:justify-end gap-3 text-xs font-semibold text-[#745b00]">
+            <span>Showing {filteredCategories.length} of {categories.length} categories</span>
+            {selectedCategoryIds.length > 0 && (
+              <button
+                onClick={() => {
+                  setBulkDeleteError(null);
+                  setIsBulkDeleteOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-2 text-white transition hover:bg-rose-700"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete selected ({selectedCategoryIds.length})
+              </button>
+            )}
           </div>
         </div>
 
@@ -145,7 +205,18 @@ export const AdminCategoriesPage: React.FC = () => {
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-[#ffecc2] border-b border-[#e5d8b8] text-[11px] font-bold text-[#241a00] uppercase tracking-wider">
-                    <th className="py-3.5 px-4 sm:px-6">Category Name</th>
+                    <th className="py-3.5 px-4 sm:px-6">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={toggleVisibleSelection}
+                          aria-label="Select all visible categories"
+                          className="h-4 w-4 accent-[#a97705]"
+                        />
+                        <span>Category Name</span>
+                      </div>
+                    </th>
                     <th className="py-3.5 px-4 hidden md:table-cell">Description</th>
                     <th className="py-3.5 px-4 text-center">Menu Items</th>
                     <th className="py-3.5 px-4 hidden sm:table-cell">Created Date</th>
@@ -156,7 +227,14 @@ export const AdminCategoriesPage: React.FC = () => {
                   {filteredCategories.map((cat) => (
                     <tr key={cat.id} className="hover:bg-white/40 transition">
                       <td className="py-3.5 px-4 sm:px-6 font-semibold text-[#241a00]">
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategoryIds.includes(cat.id)}
+                            onChange={() => toggleCategorySelection(cat.id)}
+                            aria-label={`Select ${cat.name}`}
+                            className="h-4 w-4 shrink-0 accent-[#a97705]"
+                          />
                           <div className="w-7 h-7 rounded-lg bg-[#ffecc2] text-[#745b00] flex items-center justify-center shrink-0">
                             <FolderTree className="w-3.5 h-3.5" />
                           </div>
@@ -237,6 +315,21 @@ export const AdminCategoriesPage: React.FC = () => {
           setDeleteError(null);
         }}
         onConfirm={handleConfirmDelete}
+      />
+
+      <DeleteConfirmModal
+        isOpen={isBulkDeleteOpen}
+        title={`Delete ${selectedCategoryIds.length} selected categor${selectedCategoryIds.length === 1 ? 'y' : 'ies'}?`}
+        message={bulkDeleteError || (() => {
+          const selected = categoriesWithCounts.filter((category) => selectedCategoryIds.includes(category.id));
+          const blockedCount = selected.filter((category) => category.product_count > 0).length;
+          return `This permanently removes the selected empty categories. ${blockedCount > 0 ? `${blockedCount} categor${blockedCount === 1 ? 'y contains' : 'ies contain'} menu items and will be skipped.` : 'Categories containing menu items cannot be deleted.'}`;
+        })()}
+        onClose={() => {
+          setIsBulkDeleteOpen(false);
+          setBulkDeleteError(null);
+        }}
+        onConfirm={handleBulkDelete}
       />
     </AdminLayout>
   );

@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
-import { QrCode, Sparkles, LogIn } from 'lucide-react';
+import React from 'react';
+import { Sparkles } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
-import { QrCodeModal } from '../admin/QrCodeModal';
 
 interface CustomerLayoutProps {
   children: React.ReactNode;
@@ -10,7 +9,6 @@ interface CustomerLayoutProps {
 
 export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
   const { navigate } = useNavigation();
-  const [isQrOpen, setIsQrOpen] = useState(false);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-cream flex flex-col text-ink luxury-grain">
@@ -48,25 +46,6 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                onClick={() => setIsQrOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-gold/35 text-gold-light hover:bg-gold/10 text-xs font-medium tracking-wide transition"
-                title="Share or Scan Menu QR"
-              >
-                <QrCode className="w-4 h-4" />
-                <span className="hidden sm:inline">QR Menu</span>
-              </button>
-
-              <button
-                onClick={() => navigate('/admin/login')}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-gold text-ink hover:bg-gold-light text-xs font-semibold tracking-wide transition"
-                title="Shop Owner Login"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Owner</span>
-              </button>
-            </div>
           </div>
         </header>
 
@@ -77,10 +56,6 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
         </footer>
       </div>
 
-      <QrCodeModal
-        isOpen={isQrOpen}
-        onClose={() => setIsQrOpen(false)}
-      />
     </div>
   );
 };

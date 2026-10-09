@@ -80,7 +80,7 @@ export const AdminLoginPage: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-semibold text-ink uppercase tracking-[0.16em] mb-1.5">
-                Email
+                User id
               </label>
               <div className="relative">
                 <Mail className="h-4 w-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />

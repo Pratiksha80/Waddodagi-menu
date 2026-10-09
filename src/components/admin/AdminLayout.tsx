@@ -3,8 +3,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
-import { QrCodeModal } from './QrCodeModal';
-import { SupabaseGuideModal } from './SupabaseGuideModal';
 
 interface AdminLayoutProps {
   title: string;
@@ -22,8 +20,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const { isAuthenticated } = useAuth();
   const { navigate } = useNavigation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -40,8 +36,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
       <AdminSidebar
         isMobileOpen={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
-        onOpenQrModal={() => setIsQrModalOpen(true)}
-        onOpenSupabaseGuide={() => setIsSupabaseModalOpen(true)}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -49,7 +43,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
           title={title}
           subtitle={subtitle}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
-          onOpenQrModal={() => setIsQrModalOpen(true)}
           actionButton={actionButton}
         />
 
@@ -58,15 +51,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         </main>
       </div>
 
-      <QrCodeModal
-        isOpen={isQrModalOpen}
-        onClose={() => setIsQrModalOpen(false)}
-      />
-
-      <SupabaseGuideModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
-      />
     </div>
   );
 };
