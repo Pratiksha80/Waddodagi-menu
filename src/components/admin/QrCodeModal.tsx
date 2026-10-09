@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Printer, Store } from 'lucide-react';
+import { X, Copy, Check, Printer } from 'lucide-react';
 import { QrCodeSvg } from '../common/QrCodeSvg';
 import { useToast } from '../common/Toast';
 
@@ -35,9 +35,11 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({ isOpen, onClose }) => 
       <div className="relative w-full max-w-md bg-ivory rounded-[1.6rem] shadow-2xl border border-line overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-line">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-ink text-gold flex items-center justify-center">
-              <Store className="w-4 h-4" />
-            </div>
+              <img
+                src="/waddodagi-logo.png"
+                alt="Waddodagi Sweets and Snacks logo"
+                className="w-9 h-9 shrink-0 rounded-full object-contain"
+              />
             <div>
               <h3 className="font-serif text-xl text-ink">Table standee</h3>
               <p className="text-[11px] text-muted">Permanent live QR</p>

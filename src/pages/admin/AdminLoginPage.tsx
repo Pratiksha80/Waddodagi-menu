@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Store, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigation } from '../../context/NavigationContext';
 import { useToast } from '../../components/common/Toast';
@@ -60,9 +60,11 @@ export const AdminLoginPage: React.FC = () => {
       <div className="flex flex-col justify-center py-12 px-6 sm:px-12">
         <div className="max-w-md w-full mx-auto">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-full bg-ink text-gold flex items-center justify-center">
-              <Store className="w-5 h-5" />
-            </div>
+              <img
+                src="/waddodagi-logo.png"
+                alt="Waddodagi Sweets and Snacks logo"
+                className="w-12 h-12 shrink-0 rounded-full object-contain shadow-[0_0_20px_rgba(196,163,90,0.2)]"
+              />
             <div>
               <p className="font-serif text-2xl text-ink">Owner sign in</p>
               <p className="text-[11px] tracking-[0.16em] uppercase text-muted">Shakeer</p>

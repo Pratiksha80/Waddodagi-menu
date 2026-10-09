@@ -7,8 +7,7 @@ import {
   QrCode,
   ExternalLink,
   LogOut,
-  Database,
-  Store
+  Database
 } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
 import { useAuth } from '../../context/AuthContext';
@@ -32,7 +31,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, route: '/admin/dashboard' },
     { label: 'Categories', icon: FolderTree, route: '/admin/categories' },
-    { label: 'Products', icon: ShoppingBag, route: '/admin/products' },
+    { label: 'Menu Items', icon: ShoppingBag, route: '/admin/products' },
   ];
 
   const handleNavigate = (route: string) => {
@@ -48,9 +47,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const content = (
     <aside className="w-64 bg-ink text-ivory flex flex-col h-full border-r border-gold/15">
       <div className="p-6 border-b border-gold/15 flex items-center gap-3">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-gold-light to-gold text-ink flex items-center justify-center shadow-[0_0_20px_rgba(196,163,90,0.3)]">
-          <Store className="w-5 h-5" />
-        </div>
+        <img
+          src="/waddodagi-logo.png"
+          alt="Waddodagi Sweets and Snacks logo"
+          className="w-11 h-11 shrink-0 rounded-full object-contain shadow-[0_0_20px_rgba(196,163,90,0.3)]"
+        />
         <div>
           <h1 className="font-serif text-xl leading-tight text-ivory">Shakeer</h1>
           <span className="text-[10px] tracking-[0.18em] uppercase text-gold/80">Owner atelier</span>

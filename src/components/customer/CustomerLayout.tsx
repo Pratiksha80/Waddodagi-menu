@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Store, QrCode, Sparkles, LogIn } from 'lucide-react';
+import { QrCode, Sparkles, LogIn } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
 import { QrCodeModal } from '../admin/QrCodeModal';
 
@@ -28,9 +28,11 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
               onClick={() => navigate('/menu')}
               className="flex items-center gap-3 cursor-pointer group"
             >
-              <div className="w-11 h-11 rounded-full border border-gold/50 bg-gradient-to-br from-gold-light to-gold text-ink flex items-center justify-center shadow-[0_0_24px_rgba(196,163,90,0.25)] group-hover:scale-105 transition-transform">
-                <Store className="w-5 h-5" />
-              </div>
+              <img
+                src="/waddodagi-logo.png"
+                alt="Waddodagi Sweets and Snacks logo"
+                className="w-11 h-11 shrink-0 rounded-full object-contain shadow-[0_0_24px_rgba(196,163,90,0.25)] group-hover:scale-105 transition-transform"
+              />
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl sm:text-2xl font-serif font-semibold tracking-tight text-ivory leading-none">

@@ -37,8 +37,8 @@ export const AdminDashboardPage: React.FC = () => {
   };
 
   const stats = [
-    { title: 'Products', count: counts.totalProducts, icon: ShoppingBag, note: 'All menu items' },
-    { title: 'Collections', count: counts.totalCategories, icon: FolderTree, note: 'Dynamic sections' },
+    { title: 'Menu Items', count: counts.totalProducts, icon: ShoppingBag, note: 'All menu items' },
+    { title: 'Category', count: counts.totalCategories, icon: FolderTree, note: 'Dynamic sections' },
     { title: 'Available', count: counts.availableProducts, icon: CheckCircle2, note: 'Ready to order' },
     { title: 'Sold out', count: counts.outOfStockProducts, icon: AlertCircle, note: 'Temporarily unavailable' },
   ];
@@ -61,7 +61,7 @@ export const AdminDashboardPage: React.FC = () => {
             className="btn-gold !px-3.5 !py-2"
           >
             <Plus className="w-3.5 h-3.5" />
-            Product
+            Menu Item
           </button>
         </div>
       }
