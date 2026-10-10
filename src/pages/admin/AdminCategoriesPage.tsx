@@ -57,12 +57,17 @@ export const AdminCategoriesPage: React.FC = () => {
   };
 
   const handleSaveCategory = async (data: { name: string; description?: string }) => {
-    if (editingCategory) {
-      await updateCategory(editingCategory.id, data);
-      showToast(`Category "${data.name}" updated!`, 'success');
-    } else {
-      await addCategory(data);
-      showToast(`Category "${data.name}" created!`, 'success');
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.id, data);
+        showToast(`Category "${data.name}" updated and published!`, 'success');
+      } else {
+        await addCategory(data);
+        showToast(`Category "${data.name}" created and published!`, 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.message || 'Could not publish category changes.', 'error');
+      throw err;
     }
   };
 

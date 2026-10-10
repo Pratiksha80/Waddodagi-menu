@@ -14,6 +14,7 @@ interface MenuContextType {
   products: Product[];
   counts: DashboardCounts;
   loading: boolean;
+  loadError: string | null;
   refreshData: () => Promise<void>;
   addCategory: (data: { name: string; description?: string }) => Promise<Category>;
   updateCategory: (id: string, data: { name: string; description?: string }) => Promise<Category>;
@@ -44,6 +45,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     outOfStockProducts: 0,
   });
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
     try {
@@ -55,42 +57,49 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCategories(cats);
       setProducts(prods);
       setCounts(cnts);
+      setLoadError(null);
     } catch (err) {
       console.error('Failed to load menu data:', err);
+      setLoadError(err instanceof Error ? err.message : 'Could not load the shared menu.');
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const requireOwnerSession = async () => {
+    const response = await fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' });
+    if (!response.ok) throw new Error('Your owner session has expired. Please sign in again to publish changes.');
+  };
+
   useEffect(() => {
     refreshData();
 
-    const handleLocalUpdate = () => {
-      refreshData();
-    };
-
-    window.addEventListener('local_db_updated', handleLocalUpdate);
-    window.addEventListener('storage', handleLocalUpdate);
+    const refreshTimer = window.setInterval(refreshData, 15000);
+    const handleFocus = () => { void refreshData(); };
+    window.addEventListener('focus', handleFocus);
 
     return () => {
-      window.removeEventListener('local_db_updated', handleLocalUpdate);
-      window.removeEventListener('storage', handleLocalUpdate);
+      window.clearInterval(refreshTimer);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [refreshData]);
 
   const addCategory = async (data: { name: string; description?: string }) => {
+    await requireOwnerSession();
     const created = await dbService.createCategory(data);
     await refreshData();
     return created;
   };
 
   const updateCategory = async (id: string, data: { name: string; description?: string }) => {
+    await requireOwnerSession();
     const updated = await dbService.updateCategory(id, data);
     await refreshData();
     return updated;
   };
 
   const deleteCategory = async (id: string) => {
+    await requireOwnerSession();
     await dbService.deleteCategory(id);
     await refreshData();
   };
@@ -103,18 +112,21 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     image_url?: string;
     status?: ProductStatus;
   }) => {
+    await requireOwnerSession();
     const created = await dbService.createProduct(data);
     await refreshData();
     return created;
   };
 
   const updateProduct = async (id: string, data: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>) => {
+    await requireOwnerSession();
     const updated = await dbService.updateProduct(id, data);
     await refreshData();
     return updated;
   };
 
   const deleteProduct = async (id: string) => {
+    await requireOwnerSession();
     await dbService.deleteProduct(id);
     await refreshData();
   };
@@ -123,11 +135,13 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const item = products.find(p => p.id === id);
     if (!item) return;
     const newStatus: ProductStatus = item.status === 'available' ? 'out_of_stock' : 'available';
+    await requireOwnerSession();
     await dbService.updateProduct(id, { status: newStatus });
     await refreshData();
   };
 
   const resetDatabase = async () => {
+    await requireOwnerSession();
     await dbService.clearAllData();
     await refreshData();
   };
@@ -139,6 +153,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
         products,
         counts,
         loading,
+        loadError,
         refreshData,
         addCategory,
         updateCategory,

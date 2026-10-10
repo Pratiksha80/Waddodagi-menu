@@ -14,12 +14,12 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({ isOpen, onClose }) => 
 
   if (!isOpen) return null;
 
-  const menuUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/menu`
-    : 'https://myshop.com/menu';
+  const menuUrl = 'https://waddodagi-menu.onrender.com/menu';
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(menuUrl);
+    navigator.clipboard.writeText(menuUrl).catch(() => {
+      showToast('Could not copy the menu URL. Please copy it manually.', 'info');
+    });
     setCopied(true);
     showToast('Customer Menu URL copied to clipboard!', 'success');
     setTimeout(() => setCopied(false), 2000);
@@ -61,7 +61,7 @@ export const QrCodeModal: React.FC<QrCodeModalProps> = ({ isOpen, onClose }) => 
           </div>
 
           <p className="text-[11px] text-muted leading-relaxed text-left">
-            This code always points to /menu. New sweets, prices, and sold-out flags appear the moment you publish them.
+            This permanent link opens the shared live menu. Owner changes appear for customers after saving. Keep this same QR code as long as your website address stays the same.
           </p>
 
           <div className="grid grid-cols-2 gap-3 pt-1">

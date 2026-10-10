@@ -1,16 +1,25 @@
 import { Category, Product, DatabaseState, ProductStatus } from '../types/database';
 
-const DB_STORAGE_KEY = 'mithai_menu_db_v1';
+const API_URL = '/api/menu';
+
+async function readApiResponse(response: Response): Promise<any> {
+  const body = await response.text();
+  let result: any;
+  try {
+    result = body ? JSON.parse(body) : {};
+  } catch {
+    throw new Error(response.ok
+      ? 'The server returned an unexpected response. Restart the app server and try again.'
+      : `The server could not process this request (HTTP ${response.status}). Check the server logs.`);
+  }
+  if (!response.ok) throw new Error(result.error || `Request failed (HTTP ${response.status}).`);
+  return result;
+}
 
 // Initial state must be 100% EMPTY as required by the business specification:
 // "The shop owner will add all categories and products themselves through the Admin Panel.
 // Therefore, the initial database/menu must be EMPTY.
 // Categories: 0, Products: 0"
-const INITIAL_EMPTY_DB: DatabaseState = {
-  categories: [],
-  products: [],
-};
-
 function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
@@ -18,31 +27,18 @@ function generateId(): string {
   return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
 }
 
-function loadState(): DatabaseState {
-  try {
-    const raw = localStorage.getItem(DB_STORAGE_KEY);
-    if (!raw) {
-      return INITIAL_EMPTY_DB;
-    }
-    const parsed = JSON.parse(raw);
-    return {
-      categories: Array.isArray(parsed.categories) ? parsed.categories : [],
-      products: Array.isArray(parsed.products) ? parsed.products : [],
-    };
-  } catch (err) {
-    console.error('Failed to load database from localStorage:', err);
-    return INITIAL_EMPTY_DB;
-  }
+async function loadState(): Promise<DatabaseState> {
+  const response = await fetch(API_URL, { cache: 'no-store', credentials: 'same-origin' });
+  const data = await readApiResponse(response);
+  return { categories: data.categories, products: data.products };
 }
 
-function saveState(state: DatabaseState): void {
-  try {
-    localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(state));
-    // Dispatch a storage event so all tabs or components can react if needed
-    window.dispatchEvent(new Event('local_db_updated'));
-  } catch (err) {
-    console.error('Failed to save database to localStorage:', err);
-  }
+async function saveState(state: DatabaseState): Promise<void> {
+  const response = await fetch(API_URL, {
+    method: 'PUT', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
+  });
+  await readApiResponse(response);
 }
 
 /**
@@ -52,14 +48,14 @@ function saveState(state: DatabaseState): void {
 export const dbService = {
   // --- CATEGORIES ---
   async getCategories(): Promise<Category[]> {
-    const state = loadState();
+    const state = await loadState();
     return [...state.categories].sort((a, b) => 
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   },
 
   async getCategoryById(id: string): Promise<Category | null> {
-    const state = loadState();
+    const state = await loadState();
     return state.categories.find(c => c.id === id) || null;
   },
 
@@ -69,7 +65,7 @@ export const dbService = {
       throw new Error('Category name is required');
     }
 
-    const state = loadState();
+    const state = await loadState();
     const existing = state.categories.find(
       c => c.name.toLowerCase() === trimmedName.toLowerCase()
     );
@@ -87,7 +83,7 @@ export const dbService = {
     };
 
     state.categories.push(newCategory);
-    saveState(state);
+    await saveState(state);
     return newCategory;
   },
 
@@ -97,7 +93,7 @@ export const dbService = {
       throw new Error('Category name is required');
     }
 
-    const state = loadState();
+    const state = await loadState();
     const index = state.categories.findIndex(c => c.id === id);
     if (index === -1) {
       throw new Error('Category not found');
@@ -118,12 +114,12 @@ export const dbService = {
     };
 
     state.categories[index] = updated;
-    saveState(state);
+    await saveState(state);
     return updated;
   },
 
   async deleteCategory(id: string): Promise<{ success: boolean; deletedCount: number }> {
-    const state = loadState();
+    const state = await loadState();
     const category = state.categories.find(c => c.id === id);
     if (!category) {
       throw new Error('Category not found');
@@ -138,13 +134,13 @@ export const dbService = {
     }
 
     state.categories = state.categories.filter(c => c.id !== id);
-    saveState(state);
+    await saveState(state);
     return { success: true, deletedCount: 1 };
   },
 
   // --- PRODUCTS ---
   async getProducts(filter?: { category_id?: string; status?: ProductStatus; search?: string }): Promise<Product[]> {
-    const state = loadState();
+    const state = await loadState();
     let result = [...state.products];
 
     if (filter?.category_id) {
@@ -169,7 +165,7 @@ export const dbService = {
   },
 
   async getProductById(id: string): Promise<Product | null> {
-    const state = loadState();
+    const state = await loadState();
     return state.products.find(p => p.id === id) || null;
   },
 
@@ -192,7 +188,7 @@ export const dbService = {
       throw new Error('Product price must be a positive number');
     }
 
-    const state = loadState();
+    const state = await loadState();
     const category = state.categories.find(c => c.id === data.category_id);
     if (!category) {
       throw new Error('Selected category does not exist');
@@ -212,12 +208,12 @@ export const dbService = {
     };
 
     state.products.push(newProduct);
-    saveState(state);
+    await saveState(state);
     return newProduct;
   },
 
   async updateProduct(id: string, data: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>): Promise<Product> {
-    const state = loadState();
+    const state = await loadState();
     const index = state.products.findIndex(p => p.id === id);
     if (index === -1) {
       throw new Error('Product not found');
@@ -250,19 +246,19 @@ export const dbService = {
     };
 
     state.products[index] = updated;
-    saveState(state);
+    await saveState(state);
     return updated;
   },
 
   async deleteProduct(id: string): Promise<{ success: boolean }> {
-    const state = loadState();
+    const state = await loadState();
     const exists = state.products.some(p => p.id === id);
     if (!exists) {
       throw new Error('Product not found');
     }
 
     state.products = state.products.filter(p => p.id !== id);
-    saveState(state);
+    await saveState(state);
     return { success: true };
   },
 
@@ -272,7 +268,7 @@ export const dbService = {
     availableProducts: number;
     outOfStockProducts: number;
   }> {
-    const state = loadState();
+    const state = await loadState();
     const totalProducts = state.products.length;
     const totalCategories = state.categories.length;
     const availableProducts = state.products.filter(p => p.status === 'available').length;
@@ -290,6 +286,6 @@ export const dbService = {
    * Utility to reset/clear database back to 0 categories and 0 products
    */
   async clearAllData(): Promise<void> {
-    saveState(INITIAL_EMPTY_DB);
+    await saveState({ categories: [], products: [] });
   },
 };

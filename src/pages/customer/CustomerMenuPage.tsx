@@ -6,7 +6,7 @@ import { EmptyMenuState } from '../../components/customer/EmptyMenuState';
 import { ProductCard } from '../../components/customer/ProductCard';
 
 export const CustomerMenuPage: React.FC = () => {
-  const { categories, products, loading } = useMenu();
+  const { categories, products, loading, loadError } = useMenu();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
 
@@ -33,6 +33,11 @@ export const CustomerMenuPage: React.FC = () => {
         <div className="py-20 text-center">
           <div className="w-10 h-10 border-2 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-xs tracking-[0.16em] uppercase text-muted">Loading today’s selection</p>
+        </div>
+      ) : loadError ? (
+        <div className="max-w-xl mx-auto my-16 px-6 py-8 text-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-900">
+          <h2 className="font-serif text-2xl">Menu temporarily unavailable</h2>
+          <p className="mt-2 text-sm">Please try again in a moment.</p>
         </div>
       ) : isMenuEmpty ? (
         <EmptyMenuState />

@@ -26,14 +26,23 @@ export const AdminDashboardPage: React.FC = () => {
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   const handleAddCategory = async (data: { name: string; description?: string }) => {
-    await addCategory(data);
-    showToast(`Category "${data.name}" created successfully!`, 'success');
+    try {
+      await addCategory(data);
+      showToast(`Category "${data.name}" published successfully!`, 'success');
+    } catch (err: any) {
+      showToast(err?.message || 'Could not publish category.', 'error');
+      throw err;
+    }
   };
 
   const handleResetData = async () => {
-    await resetDatabase();
-    setIsResetConfirmOpen(false);
-    showToast('Catalog reset: All categories and products cleared (0 items)', 'info');
+    try {
+      await resetDatabase();
+      setIsResetConfirmOpen(false);
+      showToast('Catalog changes published: all menu items cleared.', 'info');
+    } catch (err: any) {
+      showToast(err?.message || 'Could not publish catalog changes.', 'error');
+    }
   };
 
   const stats = [

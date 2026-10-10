@@ -59,16 +59,24 @@ export const AdminProductsPage: React.FC = () => {
   }, [products, selectedCategory, selectedStatus, searchTerm]);
 
   const handleToggleStatus = async (prod: Product) => {
-    await toggleProductStatus(prod.id);
-    const newStatus = prod.status === 'available' ? 'Out of Stock' : 'Available';
-    showToast(`"${prod.name}" status changed to ${newStatus}`, 'info');
+    try {
+      await toggleProductStatus(prod.id);
+      const newStatus = prod.status === 'available' ? 'Out of Stock' : 'Available';
+      showToast(`"${prod.name}" status changed to ${newStatus} and published`, 'info');
+    } catch (err: any) {
+      showToast(err?.message || 'Could not publish availability change.', 'error');
+    }
   };
 
   const handleConfirmDelete = async () => {
     if (!deletingProduct) return;
-    await deleteProduct(deletingProduct.id);
-    showToast(`Menu item "${deletingProduct.name}" deleted`, 'info');
-    setDeletingProduct(null);
+    try {
+      await deleteProduct(deletingProduct.id);
+      showToast(`Menu item "${deletingProduct.name}" deleted and published`, 'info');
+      setDeletingProduct(null);
+    } catch (err: any) {
+      showToast(err?.message || 'Could not publish deletion.', 'error');
+    }
   };
 
   const visibleProductIds = filteredProducts.map((product) => product.id);

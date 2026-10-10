@@ -67,10 +67,7 @@ export const AdminProductEditPage: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setError('Image file must be under 2MB');
-        return;
-      }
+      setError(null);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImageUrl(reader.result as string);
