@@ -34,7 +34,10 @@ const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: proces
 const inMemoryMenuState = { categories: [] as any[], products: [] as any[] };
 
 async function ensureMenuTables() {
-  if (!pool) return;
+  if (!pool) {
+    if (isProduction) throw new Error('DATABASE_URL is required in production; refusing to use temporary in-memory menu storage.');
+    return;
+  }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '',
@@ -50,8 +53,8 @@ async function ensureMenuTables() {
 }
 
 function requireDatabase(_req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (pool) return next();
-  return next();
+  if (pool || !isProduction) return next();
+  return res.status(503).json({ error: 'Shared menu database is unavailable. Configure DATABASE_URL and redeploy.' });
 }
 
 function requireOwner(req: express.Request, res: express.Response, next: express.NextFunction) {
