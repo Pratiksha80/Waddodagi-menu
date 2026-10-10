@@ -21,7 +21,7 @@ export class SupabaseImageStorage {
     return Boolean(this.config.url && this.config.serviceRoleKey && this.config.bucket);
   }
 
-  async upload(bytes: Buffer, contentType: ProductImageType): Promise<string> {
+  async upload(bytes: Buffer, contentType: ProductImageType, collection: 'products' | 'categories' = 'products'): Promise<string> {
     this.requireConfigured();
     if (bytes.length < 1 || bytes.length > MAX_PRODUCT_IMAGE_BYTES) {
       throw new ImageStorageError('Image must be between 1 byte and 5 MiB.', 413);
@@ -29,7 +29,7 @@ export class SupabaseImageStorage {
     const extension: Record<ProductImageType, string> = {
       'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
     };
-    const path = `products/${randomUUID()}.${extension[contentType]}`;
+    const path = `${collection}/${randomUUID()}.${extension[contentType]}`;
     const response = await this.request(`${this.baseUrl()}/storage/v1/object/${encodeURIComponent(this.config.bucket!)}/${path}`, {
       method: 'POST',
       headers: this.headers({ 'Content-Type': contentType, 'x-upsert': 'false' }),
@@ -60,10 +60,11 @@ export class SupabaseImageStorage {
       const candidate = new URL(value);
       const base = new URL(this.config.url!);
       if (candidate.origin !== base.origin) return null;
-      const prefix = `/storage/v1/object/public/${encodeURIComponent(this.config.bucket!)}/products/`;
+      const prefix = `/storage/v1/object/public/${encodeURIComponent(this.config.bucket!)}/`;
       if (!candidate.pathname.startsWith(prefix)) return null;
-      const path = decodeURIComponent(candidate.pathname.slice(prefix.length));
-      return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp|gif)$/i.test(path) ? `products/${path}` : null;
+      const objectPath = decodeURIComponent(candidate.pathname.slice(prefix.length));
+      const match = objectPath.match(/^(products|categories)\/([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp|gif))$/i);
+      return match ? `${match[1]}/${match[2]}` : null;
     } catch { return null; }
   }
 

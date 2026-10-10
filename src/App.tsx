@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationProvider, useNavigation } from './context/NavigationContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MenuProvider } from './context/MenuContext';
 import { ToastProvider } from './components/common/Toast';
+import { AppErrorBoundary } from './components/common/AppErrorBoundary';
+import { reportClientError } from './services/errorReporting';
 
 import { AdminLoginPage } from './pages/admin/AdminLoginPage';
 import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
@@ -107,12 +109,27 @@ const DevModeSwitchBar: React.FC = () => {
 };
 
 export default function App() {
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.error) reportClientError('window_error', event.error);
+    };
+    const handleRejection = (event: PromiseRejectionEvent) => reportClientError('unhandled_rejection', event.reason);
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
   return (
     <NavigationProvider>
       <AuthProvider>
         <MenuProvider>
           <ToastProvider>
-            <AppRouter />
+            <AppErrorBoundary>
+              <AppRouter />
+            </AppErrorBoundary>
           </ToastProvider>
         </MenuProvider>
       </AuthProvider>

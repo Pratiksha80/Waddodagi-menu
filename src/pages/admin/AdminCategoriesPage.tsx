@@ -56,7 +56,7 @@ export const AdminCategoriesPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSaveCategory = async (data: { name: string; description?: string }) => {
+  const handleSaveCategory = async (data: { name: string; description?: string; image_url?: string }) => {
     try {
       if (editingCategory) {
         await updateCategory(editingCategory.id, data);
@@ -240,8 +240,8 @@ export const AdminCategoriesPage: React.FC = () => {
                             aria-label={`Select ${cat.name}`}
                             className="h-4 w-4 shrink-0 accent-[#a97705]"
                           />
-                          <div className="w-7 h-7 rounded-lg bg-[#ffecc2] text-[#745b00] flex items-center justify-center shrink-0">
-                            <FolderTree className="w-3.5 h-3.5" />
+                          <div className="w-7 h-7 rounded-lg bg-[#ffecc2] text-[#745b00] flex items-center justify-center shrink-0 overflow-hidden">
+                            {cat.image_url ? <img src={cat.image_url} alt="" className="h-full w-full object-cover" /> : <FolderTree className="w-3.5 h-3.5" />}
                           </div>
                           <div>
                             <span className="block">{cat.name}</span>

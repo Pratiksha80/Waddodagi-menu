@@ -35,14 +35,17 @@ async function mutate<T>(path: string, method: string, data?: unknown): Promise<
   return readApiResponse(response) as Promise<T>;
 }
 
-export async function uploadProductImage(file: File): Promise<string> {
+async function uploadImage(file: File, purpose: 'products' | 'categories'): Promise<string> {
   const response = await fetch('/api/images', {
-    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type }, body: file,
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type, 'x-image-purpose': purpose }, body: file,
   });
   const result = await readApiResponse(response);
   if (typeof result.image_url !== 'string') throw new Error('The server did not return an image URL.');
   return result.image_url;
 }
+
+export const uploadProductImage = (file: File) => uploadImage(file, 'products');
+export const uploadCategoryImage = (file: File) => uploadImage(file, 'categories');
 
 export async function deleteUnattachedProductImage(imageUrl: string): Promise<void> {
   try { await mutate<void>('/api/images', 'DELETE', { image_url: imageUrl }); }
@@ -71,7 +74,7 @@ export const dbService = {
     return state.categories.find(c => c.id === id) || null;
   },
 
-  async createCategory(data: { name: string; description?: string }): Promise<Category> {
+  async createCategory(data: { name: string; description?: string; image_url?: string }): Promise<Category> {
     const trimmedName = data.name.trim();
     if (!trimmedName) {
       throw new Error('Category name is required');
@@ -80,11 +83,12 @@ export const dbService = {
     const result = await mutate<{ category: Category }>('/api/categories', 'POST', {
       name: trimmedName,
       description: data.description ? data.description.trim() : '',
+      image_url: data.image_url || '',
     });
     return result.category;
   },
 
-  async updateCategory(id: string, data: { name: string; description?: string }): Promise<Category> {
+  async updateCategory(id: string, data: { name: string; description?: string; image_url?: string }): Promise<Category> {
     const trimmedName = data.name.trim();
     if (!trimmedName) {
       throw new Error('Category name is required');
@@ -93,6 +97,7 @@ export const dbService = {
     const result = await mutate<{ category: Category }>(`/api/categories/${encodeURIComponent(id)}`, 'PUT', {
       name: trimmedName,
       description: data.description ? data.description.trim() : '',
+      image_url: data.image_url || '',
     });
     return result.category;
   },

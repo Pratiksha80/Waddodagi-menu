@@ -94,7 +94,7 @@ export const AdminProductAddPage: React.FC = () => {
     }
   };
 
-  const handleCreateCategory = async (data: { name: string; description?: string }) => {
+  const handleCreateCategory = async (data: { name: string; description?: string; image_url?: string }) => {
     const created = await addCategory(data);
     setCategoryId(created.id);
     showToast(`Category "${created.name}" created and selected!`, 'success');

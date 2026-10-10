@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { Category, DatabaseState, Product, ProductStatus } from '../types/database';
 
-export type CategoryInput = { name: string; description: string };
+export type CategoryInput = { name: string; description: string; image_url: string };
 export type ProductInput = {
   name: string;
   category_id: string;
@@ -15,6 +15,7 @@ export type ProductPatch = Partial<ProductInput>;
 
 export interface MenuRepository {
   list(): Promise<DatabaseState>;
+  getCategory(id: string): Promise<Category | null>;
   getProduct(id: string): Promise<Product | null>;
   isImageUrlReferenced(url: string): Promise<boolean>;
   createCategory(input: CategoryInput): Promise<Category>;
@@ -39,7 +40,8 @@ export class InMemoryMenuRepository implements MenuRepository {
   }
 
   async isImageUrlReferenced(url: string): Promise<boolean> {
-    return this.state.products.some((product) => product.image_url === url);
+    return this.state.products.some((product) => product.image_url === url)
+      || this.state.categories.some((category) => category.image_url === url);
   }
 
   async createCategory(input: CategoryInput): Promise<Category> {
@@ -50,6 +52,10 @@ export class InMemoryMenuRepository implements MenuRepository {
     const category: Category = { id: randomUUID(), ...input, created_at: now, updated_at: now };
     this.state.categories.push(category);
     return category;
+  }
+
+  async getCategory(id: string): Promise<Category | null> {
+    return this.state.categories.find((category) => category.id === id) || null;
   }
 
   async updateCategory(id: string, input: CategoryInput): Promise<Category | null> {
@@ -115,9 +121,15 @@ export class PostgresMenuRepository implements MenuRepository {
     const categories = await this.pool.query('SELECT * FROM categories ORDER BY created_at DESC');
     const products = await this.pool.query('SELECT * FROM products ORDER BY created_at DESC');
     return {
-      categories: categories.rows.map((category) => ({ ...category, description: category.description || '' })),
+      categories: categories.rows.map((category) => ({ ...category, description: category.description || '', image_url: category.image_url || '' })),
       products: products.rows.map(normalizeProduct),
     };
+  }
+
+  async getCategory(id: string): Promise<Category | null> {
+    const result = await this.pool.query<Category>('SELECT * FROM categories WHERE id = $1', [id]);
+    const category = result.rows[0];
+    return category ? { ...category, description: category.description || '', image_url: category.image_url || '' } : null;
   }
 
   async getProduct(id: string): Promise<Product | null> {
@@ -126,7 +138,10 @@ export class PostgresMenuRepository implements MenuRepository {
   }
 
   async isImageUrlReferenced(url: string): Promise<boolean> {
-    const result = await this.pool.query('SELECT 1 FROM products WHERE image_url = $1 LIMIT 1', [url]);
+    const result = await this.pool.query(
+      'SELECT 1 FROM products WHERE image_url = $1 UNION ALL SELECT 1 FROM categories WHERE image_url = $1 LIMIT 1',
+      [url],
+    );
     return Boolean(result.rowCount);
   }
 
@@ -137,8 +152,8 @@ export class PostgresMenuRepository implements MenuRepository {
       if (duplicate.rowCount) throw Object.assign(new Error('A category with this name already exists.'), { code: '23505' });
       const now = new Date().toISOString();
       const result = await client.query<Category>(
-        'INSERT INTO categories (id, name, description, created_at, updated_at) VALUES ($1, $2, $3, $4, $4) RETURNING *',
-        [randomUUID(), input.name, input.description, now],
+        'INSERT INTO categories (id, name, description, image_url, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5) RETURNING *',
+        [randomUUID(), input.name, input.description, input.image_url, now],
       );
       return result.rows[0];
     });
@@ -152,8 +167,8 @@ export class PostgresMenuRepository implements MenuRepository {
       const duplicate = await client.query('SELECT 1 FROM categories WHERE LOWER(name) = LOWER($1) AND id <> $2 LIMIT 1', [input.name, id]);
       if (duplicate.rowCount) throw Object.assign(new Error('A category with this name already exists.'), { code: '23505' });
       const result = await client.query<Category>(
-        'UPDATE categories SET name = $2, description = $3, updated_at = $4 WHERE id = $1 RETURNING *',
-        [id, input.name, input.description, new Date().toISOString()],
+        'UPDATE categories SET name = $2, description = $3, image_url = $4, updated_at = $5 WHERE id = $1 RETURNING *',
+        [id, input.name, input.description, input.image_url, new Date().toISOString()],
       );
       return result.rows[0] || null;
     });

@@ -8,6 +8,7 @@ import { loadServerConfig } from './src/server/config';
 import { InMemoryMenuRepository, PostgresMenuRepository } from './src/server/menuRepository';
 import { createMenuRouter } from './src/server/menuRoutes';
 import { SupabaseImageStorage } from './src/server/imageStorage';
+import { ResendErrorAlerts } from './src/server/errorAlerts';
 import type { DatabaseState } from './src/types/database';
 
 // Use one ignored local env file. Host-level environment variables take precedence.
@@ -18,6 +19,15 @@ const config = loadServerConfig(process.env, isProduction);
 const app = express();
 const port = config.port;
 const root = path.dirname(fileURLToPath(import.meta.url));
+const errorAlerts = new ResendErrorAlerts({
+  apiKey: process.env.RESEND_API_KEY?.trim(),
+  from: process.env.ERROR_ALERTS_FROM?.trim(),
+  to: process.env.ERROR_ALERTS_TO?.trim() || config.ownerEmail,
+});
+const reportError = (alert: Parameters<ResendErrorAlerts['notify']>[0]) => { void errorAlerts.notify(alert); };
+if (!errorAlerts.isConfigured()) {
+  console.info('Email error alerts are disabled; configure RESEND_API_KEY and ERROR_ALERTS_FROM to enable them.');
+}
 const cookieName = 'mithai_owner_session';
 const sessionDurationSeconds = 8 * 60 * 60;
 const devFallbackOwner = {
@@ -29,6 +39,8 @@ const devFallbackOwner = {
 app.disable('x-powered-by');
 // JSON_BODY_LIMIT applies to API JSON payloads. Product files use a separate 5 MiB raw-body limit.
 const jsonBodyLimit = config.jsonBodyLimit;
+// Public client error reports have a much smaller limit than menu mutation payloads.
+app.use('/api/client-errors', express.json({ limit: '8kb' }));
 app.use(express.json({ limit: jsonBodyLimit }));
 
 const databaseUrl = config.databaseUrl;
@@ -40,7 +52,9 @@ const pool = databaseUrl ? new Pool({
   max: config.databasePoolMax,
 }) : null;
 pool?.on('error', (error) => {
-  console.error('Unexpected idle PostgreSQL client error (details redacted).', { code: (error as { code?: string }).code || 'UNCLASSIFIED' });
+  const code = (error as { code?: string }).code || 'UNCLASSIFIED';
+  console.error('Unexpected idle PostgreSQL client error (details redacted).', { code });
+  reportError({ source: 'database_pool', summary: 'Unexpected idle PostgreSQL client error.', code });
 });
 const inMemoryMenuState: DatabaseState = { categories: [], products: [] };
 const menuRepository = pool ? new PostgresMenuRepository(pool) : new InMemoryMenuRepository(inMemoryMenuState);
@@ -52,9 +66,10 @@ async function ensureMenuTables() {
   }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS categories (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '',
+      id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, description TEXT NOT NULL DEFAULT '', image_url TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL, updated_at TIMESTAMPTZ NOT NULL
     );
+    ALTER TABLE categories ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
       price NUMERIC(10,2) NOT NULL CHECK (price >= 0), description TEXT NOT NULL DEFAULT '', image_url TEXT NOT NULL DEFAULT '',
@@ -74,7 +89,7 @@ const imageStorage = new SupabaseImageStorage({
   serviceRoleKey: config.supabaseServiceRoleKey,
   bucket: config.supabaseStorageBucket,
 });
-app.use('/api', createMenuRouter(menuRepository, requireOwner, imageStorage));
+app.use('/api', createMenuRouter(menuRepository, requireOwner, imageStorage, reportError));
 
 function getOwnerConfig() {
   const email = config.ownerEmail || (isProduction ? null : devFallbackOwner.email);
@@ -174,7 +189,22 @@ app.use((error: any, _req: express.Request, res: express.Response, next: express
   if (error instanceof SyntaxError && 'body' in error) {
     return res.status(400).json({ error: 'Request data is invalid.' });
   }
-  return next(error);
+  const code = typeof error?.code === 'string' ? error.code : undefined;
+  console.error('Unhandled HTTP request error (details redacted).', { name: error instanceof Error ? error.name : 'UnknownError', code: code || 'UNCLASSIFIED' });
+  reportError({ source: 'http_server', summary: error instanceof Error ? error.name : 'Unhandled request error.', route: _req.path, code });
+  return res.status(500).json({ error: 'The request could not be completed.', code: 'INTERNAL_ERROR' });
+});
+
+process.on('unhandledRejection', (reason) => {
+  const code = typeof reason === 'object' && reason !== null && 'code' in reason && typeof reason.code === 'string' ? reason.code : undefined;
+  console.error('Unhandled promise rejection (details redacted).', { name: reason instanceof Error ? reason.name : 'UnknownError', code: code || 'UNCLASSIFIED' });
+  reportError({ source: 'unhandled_rejection', summary: reason instanceof Error ? reason.name : 'Unhandled promise rejection.', code });
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught server exception (details redacted).', { name: error.name, code: (error as NodeJS.ErrnoException).code || 'UNCLASSIFIED' });
+  void errorAlerts.notify({ source: 'uncaught_exception', summary: error.name, code: (error as NodeJS.ErrnoException).code }).finally(() => process.exit(1));
+  setTimeout(() => process.exit(1), 5500).unref();
 });
 
 if (isProduction) {
@@ -182,9 +212,9 @@ if (isProduction) {
     await ensureMenuTables();
     console.log('PostgreSQL connection and menu schema are ready.');
   } catch (error) {
-    console.error('PostgreSQL startup check failed; verify the configured database URI, network access, and schema permissions. Details redacted.', {
-      code: (error as { code?: string })?.code || 'UNCLASSIFIED',
-    });
+    const code = (error as { code?: string })?.code || 'UNCLASSIFIED';
+    console.error('PostgreSQL startup check failed; verify the configured database URI, network access, and schema permissions. Details redacted.', { code });
+    await errorAlerts.notify({ source: 'startup', summary: 'PostgreSQL startup check failed.', code });
     process.exit(1);
   }
   app.use(express.static(path.join(root, 'dist')));

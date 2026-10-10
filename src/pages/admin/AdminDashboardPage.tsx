@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   ShoppingBag,
   FolderTree,
@@ -25,7 +25,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
-  const handleAddCategory = async (data: { name: string; description?: string }) => {
+  const handleAddCategory = async (data: { name: string; description?: string; image_url?: string }) => {
     try {
       await addCategory(data);
       showToast(`Category "${data.name}" published successfully!`, 'success');

@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Category, Product, ProductStatus } from '../types/database';
 import { dbService } from '../services/database';
+import { useNavigation } from './NavigationContext';
+
+const CUSTOMER_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
 
 interface DashboardCounts {
   totalProducts: number;
@@ -15,9 +18,11 @@ interface MenuContextType {
   counts: DashboardCounts;
   loading: boolean;
   loadError: string | null;
+  customerMenuIdle: boolean;
   refreshData: () => Promise<void>;
-  addCategory: (data: { name: string; description?: string }) => Promise<Category>;
-  updateCategory: (id: string, data: { name: string; description?: string }) => Promise<Category>;
+  resumeCustomerMenu: () => void;
+  addCategory: (data: { name: string; description?: string; image_url?: string }) => Promise<Category>;
+  updateCategory: (id: string, data: { name: string; description?: string; image_url?: string }) => Promise<Category>;
   deleteCategory: (id: string) => Promise<void>;
   addProduct: (data: {
     name: string;
@@ -36,6 +41,8 @@ interface MenuContextType {
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { path } = useNavigation();
+  const isCustomerRoute = !path.startsWith('/admin');
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [counts, setCounts] = useState<DashboardCounts>({
@@ -46,7 +53,10 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [customerMenuIdle, setCustomerMenuIdle] = useState(false);
   const refreshInFlight = useRef<Promise<void> | null>(null);
+  const customerIdleRef = useRef(false);
+  const lastCustomerActivity = useRef(Date.now());
 
   const refreshData = useCallback(async () => {
     if (refreshInFlight.current) return refreshInFlight.current;
@@ -79,27 +89,83 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!response.ok) throw new Error('Your owner session has expired. Please sign in again to publish changes.');
   };
 
-  useEffect(() => {
-    refreshData();
-
-    const refreshTimer = window.setInterval(refreshData, 15000);
-    const handleFocus = () => { void refreshData(); };
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.clearInterval(refreshTimer);
-      window.removeEventListener('focus', handleFocus);
-    };
+  const resumeCustomerMenu = useCallback(() => {
+    lastCustomerActivity.current = Date.now();
+    customerIdleRef.current = false;
+    setCustomerMenuIdle(false);
+    void refreshData();
   }, [refreshData]);
 
-  const addCategory = async (data: { name: string; description?: string }) => {
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
+
+  useEffect(() => {
+    let idleTimer: number | undefined;
+    const scheduleIdleLock = () => {
+      if (idleTimer !== undefined) window.clearTimeout(idleTimer);
+      const remaining = Math.max(0, CUSTOMER_IDLE_TIMEOUT_MS - (Date.now() - lastCustomerActivity.current));
+      idleTimer = window.setTimeout(() => {
+        customerIdleRef.current = true;
+        setCustomerMenuIdle(true);
+      }, remaining);
+    };
+
+    if (!isCustomerRoute) {
+      customerIdleRef.current = false;
+      setCustomerMenuIdle(false);
+    } else {
+      lastCustomerActivity.current = Date.now();
+      scheduleIdleLock();
+    }
+
+    const handleActivity = () => {
+      if (!isCustomerRoute || customerIdleRef.current) return;
+      lastCustomerActivity.current = Date.now();
+      scheduleIdleLock();
+    };
+    const handleVisible = () => {
+      if (!isCustomerRoute || document.visibilityState !== 'visible') return;
+      if (Date.now() - lastCustomerActivity.current >= CUSTOMER_IDLE_TIMEOUT_MS) {
+        customerIdleRef.current = true;
+        setCustomerMenuIdle(true);
+        return;
+      }
+      handleActivity();
+      void refreshData();
+    };
+
+    const activityEvents: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchstart', 'scroll', 'wheel'];
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, handleActivity, { passive: true }));
+    document.addEventListener('visibilitychange', handleVisible);
+    window.addEventListener('focus', handleVisible);
+
+    const refreshTimer = window.setInterval(() => {
+      if (isCustomerRoute && Date.now() - lastCustomerActivity.current >= CUSTOMER_IDLE_TIMEOUT_MS) {
+        customerIdleRef.current = true;
+        setCustomerMenuIdle(true);
+        return;
+      }
+      if (!customerIdleRef.current && document.visibilityState === 'visible') void refreshData();
+    }, 15000);
+
+    return () => {
+      if (idleTimer !== undefined) window.clearTimeout(idleTimer);
+      window.clearInterval(refreshTimer);
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, handleActivity));
+      document.removeEventListener('visibilitychange', handleVisible);
+      window.removeEventListener('focus', handleVisible);
+    };
+  }, [isCustomerRoute, refreshData]);
+
+  const addCategory = async (data: { name: string; description?: string; image_url?: string }) => {
     await requireOwnerSession();
     const created = await dbService.createCategory(data);
     await refreshData();
     return created;
   };
 
-  const updateCategory = async (id: string, data: { name: string; description?: string }) => {
+  const updateCategory = async (id: string, data: { name: string; description?: string; image_url?: string }) => {
     await requireOwnerSession();
     const updated = await dbService.updateCategory(id, data);
     await refreshData();
@@ -162,7 +228,9 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
         counts,
         loading,
         loadError,
+        customerMenuIdle,
         refreshData,
+        resumeCustomerMenu,
         addCategory,
         updateCategory,
         deleteCategory,

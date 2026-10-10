@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
+import { useMenu } from '../../context/MenuContext';
 
 interface CustomerLayoutProps {
   children: React.ReactNode;
@@ -9,6 +10,7 @@ interface CustomerLayoutProps {
 
 export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
   const { navigate } = useNavigation();
+  const { customerMenuIdle, resumeCustomerMenu } = useMenu();
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-cream flex flex-col text-ink luxury-grain">
@@ -55,6 +57,16 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
           <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6" />
         </footer>
       </div>
+
+      {customerMenuIdle && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 px-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="menu-paused-title">
+          <div className="w-full max-w-md rounded-3xl border border-gold/30 bg-ivory p-8 text-center shadow-2xl">
+            <h2 id="menu-paused-title" className="font-serif text-3xl text-ink">Menu paused</h2>
+            <p className="mt-3 text-sm leading-6 text-muted">This menu paused after 20 minutes without activity. Tap below to continue browsing.</p>
+            <button type="button" onClick={resumeCustomerMenu} className="btn-gold mt-6">Continue to menu</button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
