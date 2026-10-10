@@ -4,15 +4,19 @@ import path from 'node:path';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
+import { loadServerConfig } from './src/server/config';
+import { InMemoryMenuRepository, PostgresMenuRepository } from './src/server/menuRepository';
+import { createMenuRouter } from './src/server/menuRoutes';
+import { SupabaseImageStorage } from './src/server/imageStorage';
+import type { DatabaseState } from './src/types/database';
 
-const envFiles = process.env.NODE_ENV === 'production'
-  ? ['.env.production', '.env.local', '.env']
-  : ['.env.local', '.env'];
-dotenv.config({ path: envFiles });
+// Use one ignored local env file. Host-level environment variables take precedence.
+dotenv.config({ path: '.env', override: false, quiet: true });
 
-const app = express();
-const port = Number(process.env.PORT || 3000);
 const isProduction = process.env.NODE_ENV === 'production';
+const config = loadServerConfig(process.env, isProduction);
+const app = express();
+const port = config.port;
 const root = path.dirname(fileURLToPath(import.meta.url));
 const cookieName = 'mithai_owner_session';
 const sessionDurationSeconds = 8 * 60 * 60;
@@ -23,23 +27,23 @@ const devFallbackOwner = {
   sessionSecret: 'dev-session-secret-32-characters-long',
 };
 app.disable('x-powered-by');
-// Menu images are sent as base64 data URLs. Increase JSON_BODY_LIMIT on the host
-// if large catalogs or images need more space (for example, 250mb).
-const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '100mb';
+// JSON_BODY_LIMIT applies to API JSON payloads. Product files use a separate 5 MiB raw-body limit.
+const jsonBodyLimit = config.jsonBodyLimit;
 app.use(express.json({ limit: jsonBodyLimit }));
 
-const databaseUrl = process.env.DATABASE_URL;
-if (databaseUrl?.includes('[YOUR-PASSWORD]') || databaseUrl?.includes('YOUR-PASSWORD')) {
-  throw new Error('Replace the Supabase [YOUR-PASSWORD] placeholder in DATABASE_URL with your database password.');
-}
-if (isProduction && databaseUrl) {
-  const databaseHost = new URL(databaseUrl).hostname;
-  if (databaseHost.startsWith('db.') && databaseHost.endsWith('.supabase.co')) {
-    throw new Error('Render cannot reach this Supabase direct database endpoint. Use the IPv4-compatible Session pooler URL from Supabase Connect.');
-  }
-}
-const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: process.env.DATABASE_SSL === 'false' ? undefined : { rejectUnauthorized: false } }) : null;
-const inMemoryMenuState = { categories: [] as any[], products: [] as any[] };
+const databaseUrl = config.databaseUrl;
+const pool = databaseUrl ? new Pool({
+  connectionString: databaseUrl,
+  ssl: config.databaseSsl ? { rejectUnauthorized: false } : undefined,
+  connectionTimeoutMillis: config.databaseConnectionTimeoutMs,
+  idleTimeoutMillis: config.databaseIdleTimeoutMs,
+  max: config.databasePoolMax,
+}) : null;
+pool?.on('error', (error) => {
+  console.error('Unexpected idle PostgreSQL client error (details redacted).', { code: (error as { code?: string }).code || 'UNCLASSIFIED' });
+});
+const inMemoryMenuState: DatabaseState = { categories: [], products: [] };
+const menuRepository = pool ? new PostgresMenuRepository(pool) : new InMemoryMenuRepository(inMemoryMenuState);
 
 async function ensureMenuTables() {
   if (!pool) {
@@ -60,93 +64,27 @@ async function ensureMenuTables() {
   `);
 }
 
-function requireDatabase(_req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (pool || !isProduction) return next();
-  return res.status(503).json({ error: 'Shared menu database is unavailable. Configure DATABASE_URL and redeploy.' });
-}
-
 function requireOwner(req: express.Request, res: express.Response, next: express.NextFunction) {
   if (!sessionUser(req)) return res.status(401).json({ error: 'Owner sign in required.' });
   next();
 }
 
-app.get('/api/menu', requireDatabase, async (_req, res) => {
-  try {
-    if (!pool) {
-      res.set('Cache-Control', 'no-store');
-      return res.json({ categories: inMemoryMenuState.categories, products: inMemoryMenuState.products });
-    }
-
-    const [categories, products] = await Promise.all([
-      pool.query('SELECT * FROM categories ORDER BY created_at DESC'),
-      pool.query('SELECT * FROM products ORDER BY created_at DESC'),
-    ]);
-    res.set('Cache-Control', 'no-store');
-    return res.json({ categories: categories.rows, products: products.rows });
-  } catch (error) {
-    console.error('Failed to load shared menu:', error);
-    return res.status(500).json({ error: 'Could not load the shared menu.' });
-  }
+const imageStorage = new SupabaseImageStorage({
+  url: config.supabaseUrl,
+  serviceRoleKey: config.supabaseServiceRoleKey,
+  bucket: config.supabaseStorageBucket,
 });
-
-app.put('/api/menu', requireDatabase, requireOwner, async (req, res) => {
-  const categories = req.body?.categories;
-  const products = req.body?.products;
-  if (!Array.isArray(categories) || !Array.isArray(products)) return res.status(400).json({ error: 'Categories and products are required.' });
-
-  if (!pool) {
-    inMemoryMenuState.categories = categories;
-    inMemoryMenuState.products = products;
-    return res.json({ success: true });
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const publishedAt = new Date().toISOString();
-    const normalizedCategories = categories.map((category: any) => ({
-      id: String(category.id || ''), name: String(category.name || '').trim(),
-      description: String(category.description || ''), created_at: category.created_at || publishedAt, updated_at: category.updated_at || publishedAt,
-    }));
-    const normalizedProducts = products.map((product: any) => ({
-      id: String(product.id || ''), name: String(product.name || '').trim(), category_id: String(product.category_id || ''),
-      price: Number(product.price), description: String(product.description || ''), image_url: String(product.image_url || ''),
-      status: product.status, created_at: product.created_at || publishedAt, updated_at: product.updated_at || publishedAt,
-    }));
-    if (normalizedCategories.some((category: any) => !category.id || !category.name)) throw new Error('Invalid category data.');
-    if (normalizedProducts.some((product: any) => !product.id || !product.name || !Number.isFinite(product.price) || product.price < 0 || !['available', 'out_of_stock'].includes(product.status))) throw new Error('Invalid product data.');
-    await client.query('CREATE TEMP TABLE next_categories (LIKE categories INCLUDING ALL) ON COMMIT DROP');
-    await client.query('CREATE TEMP TABLE next_products (LIKE products INCLUDING ALL) ON COMMIT DROP');
-    for (const category of normalizedCategories) {
-      await client.query('INSERT INTO next_categories (id, name, description, created_at, updated_at) VALUES ($1,$2,$3,$4,$5)', [category.id, category.name, category.description, category.created_at, category.updated_at || publishedAt]);
-    }
-    for (const product of normalizedProducts) {
-      await client.query('INSERT INTO next_products (id, name, category_id, price, description, image_url, status, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)', [product.id, product.name, product.category_id, product.price, product.description, product.image_url, product.status, product.created_at, product.updated_at || publishedAt]);
-    }
-    await client.query('DELETE FROM products');
-    await client.query('DELETE FROM categories');
-    await client.query('INSERT INTO categories SELECT * FROM next_categories');
-    await client.query('INSERT INTO products SELECT * FROM next_products');
-    await client.query('COMMIT');
-    return res.json({ success: true });
-  } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Failed to save shared menu:', error);
-    return res.status(400).json({ error: 'Could not save the shared menu. Check category references and menu values.' });
-  } finally {
-    client.release();
-  }
-});
+app.use('/api', createMenuRouter(menuRepository, requireOwner, imageStorage));
 
 function getOwnerConfig() {
-  const email = process.env.OWNER_EMAIL?.trim().toLowerCase() || (isProduction ? null : devFallbackOwner.email);
-  const password = process.env.OWNER_PASSWORD || (isProduction ? null : devFallbackOwner.password);
-  const name = process.env.OWNER_NAME?.trim() || (isProduction ? 'Shop Owner' : devFallbackOwner.name);
+  const email = config.ownerEmail || (isProduction ? null : devFallbackOwner.email);
+  const password = config.ownerPassword || (isProduction ? null : devFallbackOwner.password);
+  const name = config.ownerName || (isProduction ? 'Shop Owner' : devFallbackOwner.name);
   return { email, password, name };
 }
 
 function signingKey() {
-  const key = process.env.SESSION_SECRET || (isProduction ? undefined : devFallbackOwner.sessionSecret);
+  const key = config.sessionSecret || (isProduction ? undefined : devFallbackOwner.sessionSecret);
   if (!key || key.length < 32) throw new Error('SESSION_SECRET must be configured with at least 32 characters.');
   return key;
 }
@@ -230,6 +168,7 @@ app.use((req, res, next) => {
 
 app.use((error: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (error?.type === 'entity.too.large') {
+    if (_req.path === '/api/images') return res.status(413).json({ error: 'Image exceeds the 5 MiB per-file limit.', code: 'IMAGE_TOO_LARGE' });
     return res.status(413).json({ error: `Upload exceeds the server request limit (${jsonBodyLimit}). Increase JSON_BODY_LIMIT in the server environment.` });
   }
   if (error instanceof SyntaxError && 'body' in error) {
@@ -239,7 +178,15 @@ app.use((error: any, _req: express.Request, res: express.Response, next: express
 });
 
 if (isProduction) {
-  await ensureMenuTables();
+  try {
+    await ensureMenuTables();
+    console.log('PostgreSQL connection and menu schema are ready.');
+  } catch (error) {
+    console.error('PostgreSQL startup check failed; verify the configured database URI, network access, and schema permissions. Details redacted.', {
+      code: (error as { code?: string })?.code || 'UNCLASSIFIED',
+    });
+    process.exit(1);
+  }
   app.use(express.static(path.join(root, 'dist')));
   app.get('*', (_req, res) => res.sendFile(path.join(root, 'dist', 'index.html')));
   app.listen(port, '0.0.0.0', () => console.log(`App listening on ${port}`));

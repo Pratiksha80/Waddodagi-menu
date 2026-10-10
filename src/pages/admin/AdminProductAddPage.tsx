@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   ArrowLeft, 
   Upload, 
@@ -15,6 +15,7 @@ import { useNavigation } from '../../context/NavigationContext';
 import { ProductStatus } from '../../types/database';
 import { CategoryModal } from '../../components/admin/CategoryModal';
 import { useToast } from '../../components/common/Toast';
+import { deleteUnattachedProductImage, uploadProductImage } from '../../services/database';
 
 export const AdminProductAddPage: React.FC = () => {
   const { categories, addProduct, addCategory } = useMenu();
@@ -26,22 +27,23 @@ export const AdminProductAddPage: React.FC = () => {
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [status, setStatus] = useState<ProductStatus>('available');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
+  useEffect(() => () => { if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setError(null);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImageUrl(reader.result as string);
-        setError(null);
-      };
-      reader.readAsDataURL(file);
+      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) { setError('Choose a JPEG, PNG, WebP, or GIF image.'); return; }
+      if (file.size < 1 || file.size > 5 * 1024 * 1024) { setError('Image must be smaller than 5 MiB.'); return; }
+      setImageFile(file);
+      setImageUrl(URL.createObjectURL(file));
     }
   };
 
@@ -68,14 +70,20 @@ export const AdminProductAddPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      await addProduct({
-        name: cleanName,
-        category_id: categoryId,
-        price: numPrice,
-        description: description.trim(),
-        image_url: imageUrl.trim(),
-        status,
-      });
+      const storedImageUrl = imageFile ? await uploadProductImage(imageFile) : imageUrl.trim();
+      try {
+        await addProduct({
+          name: cleanName,
+          category_id: categoryId,
+          price: numPrice,
+          description: description.trim(),
+          image_url: storedImageUrl,
+          status,
+        });
+      } catch (saveError) {
+        if (imageFile && storedImageUrl.startsWith('http')) await deleteUnattachedProductImage(storedImageUrl);
+        throw saveError;
+      }
 
       showToast(`"${cleanName}" added to the menu!`, 'success');
       navigate('/admin/products');
@@ -254,9 +262,10 @@ export const AdminProductAddPage: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
                 <div className="sm:col-span-6">
                   <input
-                    type="url"
+                    type="text"
+                    inputMode="url"
                     value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
+                    onChange={(e) => { setImageFile(null); setImageUrl(e.target.value); }}
                     placeholder="https://example.com/item.jpg"
                     className="w-full px-3.5 py-2.5 rounded-lg border border-[#ccc7aa] bg-white text-xs sm:text-sm text-[#241a00] placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#fdec00]"
                   />
@@ -267,7 +276,7 @@ export const AdminProductAddPage: React.FC = () => {
                     <span>Capture Photo</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
                       capture="environment"
                       onChange={handleFileUpload}
                       className="hidden"
@@ -280,7 +289,7 @@ export const AdminProductAddPage: React.FC = () => {
                     <span>Upload File</span>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
                       onChange={handleFileUpload}
                       className="hidden"
                     />

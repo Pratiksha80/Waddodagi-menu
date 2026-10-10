@@ -20,25 +20,33 @@ async function readApiResponse(response: Response): Promise<any> {
 // "The shop owner will add all categories and products themselves through the Admin Panel.
 // Therefore, the initial database/menu must be EMPTY.
 // Categories: 0, Products: 0"
-function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
-}
-
 async function loadState(): Promise<DatabaseState> {
   const response = await fetch(API_URL, { cache: 'no-store', credentials: 'same-origin' });
   const data = await readApiResponse(response);
   return { categories: data.categories, products: data.products };
 }
 
-async function saveState(state: DatabaseState): Promise<void> {
-  const response = await fetch(API_URL, {
-    method: 'PUT', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
+async function mutate<T>(path: string, method: string, data?: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    credentials: 'same-origin',
+    ...(data === undefined ? {} : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
   });
-  await readApiResponse(response);
+  return readApiResponse(response) as Promise<T>;
+}
+
+export async function uploadProductImage(file: File): Promise<string> {
+  const response = await fetch('/api/images', {
+    method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': file.type }, body: file,
+  });
+  const result = await readApiResponse(response);
+  if (typeof result.image_url !== 'string') throw new Error('The server did not return an image URL.');
+  return result.image_url;
+}
+
+export async function deleteUnattachedProductImage(imageUrl: string): Promise<void> {
+  try { await mutate<void>('/api/images', 'DELETE', { image_url: imageUrl }); }
+  catch { /* Keep product save errors primary; an unreferenced object can be cleaned up later. */ }
 }
 
 /**
@@ -46,6 +54,10 @@ async function saveState(state: DatabaseState): Promise<void> {
  * Structured as an async repository so it mirrors Supabase client query patterns.
  */
 export const dbService = {
+  async getMenuState(): Promise<DatabaseState> {
+    return loadState();
+  },
+
   // --- CATEGORIES ---
   async getCategories(): Promise<Category[]> {
     const state = await loadState();
@@ -65,26 +77,11 @@ export const dbService = {
       throw new Error('Category name is required');
     }
 
-    const state = await loadState();
-    const existing = state.categories.find(
-      c => c.name.toLowerCase() === trimmedName.toLowerCase()
-    );
-    if (existing) {
-      throw new Error(`Category "${trimmedName}" already exists`);
-    }
-
-    const now = new Date().toISOString();
-    const newCategory: Category = {
-      id: generateId(),
+    const result = await mutate<{ category: Category }>('/api/categories', 'POST', {
       name: trimmedName,
       description: data.description ? data.description.trim() : '',
-      created_at: now,
-      updated_at: now,
-    };
-
-    state.categories.push(newCategory);
-    await saveState(state);
-    return newCategory;
+    });
+    return result.category;
   },
 
   async updateCategory(id: string, data: { name: string; description?: string }): Promise<Category> {
@@ -93,48 +90,15 @@ export const dbService = {
       throw new Error('Category name is required');
     }
 
-    const state = await loadState();
-    const index = state.categories.findIndex(c => c.id === id);
-    if (index === -1) {
-      throw new Error('Category not found');
-    }
-
-    const duplicate = state.categories.find(
-      c => c.id !== id && c.name.toLowerCase() === trimmedName.toLowerCase()
-    );
-    if (duplicate) {
-      throw new Error(`Another category named "${trimmedName}" already exists`);
-    }
-
-    const updated: Category = {
-      ...state.categories[index],
+    const result = await mutate<{ category: Category }>(`/api/categories/${encodeURIComponent(id)}`, 'PUT', {
       name: trimmedName,
-      description: data.description !== undefined ? data.description.trim() : state.categories[index].description,
-      updated_at: new Date().toISOString(),
-    };
-
-    state.categories[index] = updated;
-    await saveState(state);
-    return updated;
+      description: data.description ? data.description.trim() : '',
+    });
+    return result.category;
   },
 
   async deleteCategory(id: string): Promise<{ success: boolean; deletedCount: number }> {
-    const state = await loadState();
-    const category = state.categories.find(c => c.id === id);
-    if (!category) {
-      throw new Error('Category not found');
-    }
-
-    // Check if products exist in this category (PostgreSQL foreign key RESTRICT simulation)
-    const attachedProducts = state.products.filter(p => p.category_id === id);
-    if (attachedProducts.length > 0) {
-      throw new Error(
-        `Cannot delete "${category.name}" because it still contains ${attachedProducts.length} product(s). Please move or delete the products first.`
-      );
-    }
-
-    state.categories = state.categories.filter(c => c.id !== id);
-    await saveState(state);
+    await mutate<{ success: boolean }>(`/api/categories/${encodeURIComponent(id)}`, 'DELETE');
     return { success: true, deletedCount: 1 };
   },
 
@@ -188,37 +152,18 @@ export const dbService = {
       throw new Error('Product price must be a positive number');
     }
 
-    const state = await loadState();
-    const category = state.categories.find(c => c.id === data.category_id);
-    if (!category) {
-      throw new Error('Selected category does not exist');
-    }
-
-    const now = new Date().toISOString();
-    const newProduct: Product = {
-      id: generateId(),
+    const result = await mutate<{ product: Product }>('/api/products', 'POST', {
       name: trimmedName,
       category_id: data.category_id,
       price: data.price,
-      description: data.description ? data.description.trim() : '',
-      image_url: data.image_url ? data.image_url.trim() : '',
+      description: data.description || '',
+      image_url: data.image_url || '',
       status: data.status || 'available',
-      created_at: now,
-      updated_at: now,
-    };
-
-    state.products.push(newProduct);
-    await saveState(state);
-    return newProduct;
+    });
+    return result.product;
   },
 
   async updateProduct(id: string, data: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>): Promise<Product> {
-    const state = await loadState();
-    const index = state.products.findIndex(p => p.id === id);
-    if (index === -1) {
-      throw new Error('Product not found');
-    }
-
     if (data.name !== undefined && !data.name.trim()) {
       throw new Error('Product name cannot be empty');
     }
@@ -227,38 +172,17 @@ export const dbService = {
       throw new Error('Product price must be a positive number');
     }
 
-    if (data.category_id !== undefined) {
-      const category = state.categories.find(c => c.id === data.category_id);
-      if (!category) {
-        throw new Error('Selected category does not exist');
-      }
-    }
+    const result = await mutate<{ product: Product }>(`/api/products/${encodeURIComponent(id)}`, 'PUT', data);
+    return result.product;
+  },
 
-    const updated: Product = {
-      ...state.products[index],
-      ...(data.name !== undefined && { name: data.name.trim() }),
-      ...(data.category_id !== undefined && { category_id: data.category_id }),
-      ...(data.price !== undefined && { price: data.price }),
-      ...(data.description !== undefined && { description: data.description.trim() }),
-      ...(data.image_url !== undefined && { image_url: data.image_url.trim() }),
-      ...(data.status !== undefined && { status: data.status }),
-      updated_at: new Date().toISOString(),
-    };
-
-    state.products[index] = updated;
-    await saveState(state);
-    return updated;
+  async setProductAvailability(id: string, status: ProductStatus): Promise<Product> {
+    const result = await mutate<{ product: Product }>(`/api/products/${encodeURIComponent(id)}/availability`, 'PATCH', { status });
+    return result.product;
   },
 
   async deleteProduct(id: string): Promise<{ success: boolean }> {
-    const state = await loadState();
-    const exists = state.products.some(p => p.id === id);
-    if (!exists) {
-      throw new Error('Product not found');
-    }
-
-    state.products = state.products.filter(p => p.id !== id);
-    await saveState(state);
+    await mutate<{ success: boolean }>(`/api/products/${encodeURIComponent(id)}`, 'DELETE');
     return { success: true };
   },
 
@@ -286,6 +210,6 @@ export const dbService = {
    * Utility to reset/clear database back to 0 categories and 0 products
    */
   async clearAllData(): Promise<void> {
-    await saveState({ categories: [], products: [] });
+    await mutate<{ success: boolean }>('/api/menu/reset', 'POST', {});
   },
 };

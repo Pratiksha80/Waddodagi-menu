@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Category, Product, ProductStatus } from '../types/database';
 import { dbService } from '../services/database';
 
@@ -46,24 +46,32 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
 
   const refreshData = useCallback(async () => {
-    try {
-      const [cats, prods, cnts] = await Promise.all([
-        dbService.getCategories(),
-        dbService.getProducts(),
-        dbService.getDashboardCounts(),
-      ]);
-      setCategories(cats);
-      setProducts(prods);
-      setCounts(cnts);
-      setLoadError(null);
-    } catch (err) {
-      console.error('Failed to load menu data:', err);
-      setLoadError(err instanceof Error ? err.message : 'Could not load the shared menu.');
-    } finally {
-      setLoading(false);
-    }
+    if (refreshInFlight.current) return refreshInFlight.current;
+    const refresh = (async () => {
+      try {
+        const state = await dbService.getMenuState();
+        setCategories(state.categories);
+        setProducts(state.products);
+        setCounts({
+          totalProducts: state.products.length,
+          totalCategories: state.categories.length,
+          availableProducts: state.products.filter((product) => product.status === 'available').length,
+          outOfStockProducts: state.products.filter((product) => product.status === 'out_of_stock').length,
+        });
+        setLoadError(null);
+      } catch (err) {
+        console.error('Failed to load menu data:', err);
+        setLoadError(err instanceof Error ? err.message : 'Could not load the shared menu.');
+      } finally {
+        setLoading(false);
+        refreshInFlight.current = null;
+      }
+    })();
+    refreshInFlight.current = refresh;
+    return refresh;
   }, []);
 
   const requireOwnerSession = async () => {
@@ -136,7 +144,7 @@ export const MenuProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!item) return;
     const newStatus: ProductStatus = item.status === 'available' ? 'out_of_stock' : 'available';
     await requireOwnerSession();
-    await dbService.updateProduct(id, { status: newStatus });
+    await dbService.setProductAvailability(id, newStatus);
     await refreshData();
   };
 

@@ -17,13 +17,13 @@ View your app in AI Studio: https://ai.studio/apps/6b95ba6c-1902-4b1e-8be5-2b73b
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Copy `.env.example` to `.env` and fill the required server settings; current app code does not use `GEMINI_API_KEY`.
 3. Run the app:
    `npm run dev`
 
 ## Owner authentication and menu storage
 
-Configure `OWNER_EMAIL`, `OWNER_PASSWORD`, `OWNER_NAME`, and a random `SESSION_SECRET` of at least 32 characters in `.env.local`. These are read by the server and must not use a `VITE_` prefix. Owner sign-in is verified by the server and uses a signed, eight-hour, HTTP-only, same-site cookie. The browser does not store the password or a trusted session flag. Configure the same server-only variables in production and run `npm run build` followed by `npm start`.
+Configure `OWNER_EMAIL`, `OWNER_PASSWORD`, `OWNER_NAME`, and a random `SESSION_SECRET` of at least 32 characters in `.env`. These are read by the server and must not use a `VITE_` prefix. Owner sign-in is verified by the server and uses a signed, eight-hour, HTTP-only, same-site cookie. The browser does not store the password or a trusted session flag. Configure the same server-only variables in the production host environment and run `npm run build` followed by `npm start`.
 
 Categories and products are stored in PostgreSQL through the Express server. For Supabase on Render, open the Supabase project's **Connect** dialog and select **Session pooler**; this connection is IPv4-compatible. Add the full connection string as `DATABASE_URL` in the Render web service environment, replacing `[YOUR-PASSWORD]` with the database password and URL-encoding reserved password characters. Also set `OWNER_EMAIL`, `OWNER_PASSWORD`, `OWNER_NAME`, and a random `SESSION_SECRET` of at least 32 characters. Keep these server-side; never use a `VITE_` prefix. The server creates the menu tables on startup. Public customers can read the menu; changes require the owner session cookie. Existing menu data saved in browser localStorage is not automatically migrated; copy/re-enter it after the shared database is live.
 =======
