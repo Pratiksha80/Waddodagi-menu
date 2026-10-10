@@ -5,8 +5,10 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Pool } from 'pg';
 
-dotenv.config({ path: '.env.local' });
-dotenv.config();
+const envFiles = process.env.NODE_ENV === 'production'
+  ? ['.env.production', '.env.local', '.env']
+  : ['.env.local', '.env'];
+dotenv.config({ path: envFiles });
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -29,6 +31,12 @@ app.use(express.json({ limit: jsonBodyLimit }));
 const databaseUrl = process.env.DATABASE_URL;
 if (databaseUrl?.includes('[YOUR-PASSWORD]') || databaseUrl?.includes('YOUR-PASSWORD')) {
   throw new Error('Replace the Supabase [YOUR-PASSWORD] placeholder in DATABASE_URL with your database password.');
+}
+if (isProduction && databaseUrl) {
+  const databaseHost = new URL(databaseUrl).hostname;
+  if (databaseHost.startsWith('db.') && databaseHost.endsWith('.supabase.co')) {
+    throw new Error('Render cannot reach this Supabase direct database endpoint. Use the IPv4-compatible Session pooler URL from Supabase Connect.');
+  }
 }
 const pool = databaseUrl ? new Pool({ connectionString: databaseUrl, ssl: process.env.DATABASE_SSL === 'false' ? undefined : { rejectUnauthorized: false } }) : null;
 const inMemoryMenuState = { categories: [] as any[], products: [] as any[] };
