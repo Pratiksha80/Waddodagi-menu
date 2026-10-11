@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { Home, LayoutGrid, Sparkles } from 'lucide-react';
 import { useNavigation } from '../../context/NavigationContext';
 import { useMenu } from '../../context/MenuContext';
 
@@ -9,7 +9,7 @@ interface CustomerLayoutProps {
 }
 
 export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
-  const { navigate } = useNavigation();
+  const { navigate, path } = useNavigation();
   const { customerMenuIdle, resumeCustomerMenu } = useMenu();
 
   return (
@@ -51,12 +51,35 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-24">{children}</main>
 
         <footer className="mt-4 border-t border-gold/20 bg-ink text-ivory">
           <div className="max-w-6xl mx-auto px-4 sm:px-8 py-6" />
         </footer>
       </div>
+
+      <nav aria-label="Customer navigation" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-white/95 shadow-[0_-8px_24px_rgba(20,12,8,0.08)] backdrop-blur-sm">
+        <div className="mx-auto flex max-w-6xl items-center justify-around px-6 py-3">
+          <button
+            type="button"
+            onClick={() => navigate('/home')}
+            aria-current={path === '/home' ? 'page' : undefined}
+            className={`flex min-w-24 flex-col items-center gap-1 text-xs font-medium transition-colors ${path === '/home' ? 'text-gold-deep' : 'text-muted hover:text-ink'}`}
+          >
+            <Home className="h-6 w-6" aria-hidden="true" />
+            <span>Home</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/menu')}
+            aria-current={path.startsWith('/menu') ? 'page' : undefined}
+            className={`flex min-w-24 flex-col items-center gap-1 text-xs font-medium transition-colors ${path.startsWith('/menu') ? 'text-gold-deep' : 'text-muted hover:text-ink'}`}
+          >
+            <LayoutGrid className="h-6 w-6" aria-hidden="true" />
+            <span>Menu</span>
+          </button>
+        </div>
+      </nav>
 
       {customerMenuIdle && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 px-5 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="menu-paused-title">

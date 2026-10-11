@@ -96,6 +96,19 @@ export const AdminDashboardPage: React.FC = () => {
           })}
         </div>
 
+        {products.length > 0 && (
+          <div className="w-full border-t border-line">
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                categoryName={categories.find((category) => category.id === product.category_id)?.name}
+                layout="horizontal"
+              />
+            ))}
+          </div>
+        )}
+
         <div className="max-w-[31.5rem] mx-auto rounded-xl border border-line bg-[#fffaf2] overflow-hidden shadow-[0_18px_40px_rgba(20,12,8,0.06)]">
             <div className="relative h-[11.5rem] overflow-hidden bg-[linear-gradient(135deg,#f4e3bd,#f8edda)] flex items-center justify-center">
               <div className="absolute top-3.5 flex items-center gap-2 text-gold/70" aria-hidden="true"><span className="h-px w-9 bg-gold/40" /><span className="text-[10px]">◇</span><span className="h-px w-9 bg-gold/40" /></div>
@@ -116,17 +129,6 @@ export const AdminDashboardPage: React.FC = () => {
             </div>
           </div>
 
-        {products.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                categoryName={categories.find((category) => category.id === product.category_id)?.name}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       <CategoryModal

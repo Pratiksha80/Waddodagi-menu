@@ -14,6 +14,7 @@ import { AdminProductAddPage } from './pages/admin/AdminProductAddPage';
 import { AdminProductEditPage } from './pages/admin/AdminProductEditPage';
 
 import { CustomerMenuPage } from './pages/customer/CustomerMenuPage';
+import { CustomerHomePage } from './pages/customer/CustomerHomePage';
 import { CustomerCategoryPage } from './pages/customer/CustomerCategoryPage';
 import { CustomerProductDetailsPage } from './pages/customer/CustomerProductDetailsPage';
 
@@ -48,6 +49,9 @@ const AppRouter: React.FC = () => {
 
     if (path.startsWith('/menu/category/')) {
       return <CustomerCategoryPage />;
+    }
+    if (path === '/home') {
+      return <CustomerHomePage />;
     }
     if (path.startsWith('/menu/product/')) {
       return <CustomerProductDetailsPage />;
