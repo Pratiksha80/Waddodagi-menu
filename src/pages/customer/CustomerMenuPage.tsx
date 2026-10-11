@@ -94,6 +94,12 @@ export const CustomerMenuPage: React.FC = () => {
 
           {categories.length > 0 && (
             <div className="flex flex-nowrap items-start gap-4 sm:gap-6 min-w-0 w-full overflow-x-auto pb-3 scrollbar-none">
+              <CategoryTile
+                label="All"
+                count={products.length}
+                active={selectedCategoryId === 'all'}
+                onClick={() => setSelectedCategoryId('all')}
+              />
               {categories.map((category) => {
                 const categoryProducts = products.filter((product) => product.category_id === category.id);
                 return (
