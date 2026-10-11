@@ -33,7 +33,7 @@ export const CustomerHomePage: React.FC = () => {
             Fresh batches throughout the day
           </p>
           <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Waddodagi</h2>
-          <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Sweets &amp; Snacks · Pure Veg</p>
+          <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Sweets &amp; Snacks</p>
           <button
             type="button"
             onClick={() => navigate('/menu')}

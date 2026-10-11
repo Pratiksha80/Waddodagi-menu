@@ -38,9 +38,6 @@ export const CustomerLayout: React.FC<CustomerLayoutProps> = ({ children }) => {
                   <h1 className="text-xl sm:text-2xl font-serif font-semibold tracking-tight text-ivory leading-none">
                     Waddodagi<span className="text-gold italic"></span> 
                   </h1>
-                  <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[9px] font-semibold tracking-[0.14em] bg-gold/15 text-gold-light border border-gold/30">
-                    PURE VEG
-                  </span>
                 </div>
                 <p className="text-[11px] text-gold-light/70 font-light tracking-[0.16em] uppercase mt-1">
                   Sweets & Snacks
