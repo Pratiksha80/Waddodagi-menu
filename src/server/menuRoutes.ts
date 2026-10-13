@@ -2,7 +2,6 @@ import express, { type RequestHandler } from 'express';
 import type { CategoryInput, MenuRepository, ProductInput, ProductPatch } from './menuRepository';
 import type { ProductStatus } from '../types/database';
 import { hasValidImageSignature, isAllowedImageType, MAX_PRODUCT_IMAGE_BYTES, SupabaseImageStorage } from './imageStorage';
-import type { ErrorAlert } from './errorAlerts';
 
 const maxNameLength = 255;
 const maxDescriptionLength = 20000;
@@ -78,27 +77,23 @@ function productPatch(value: unknown): ProductPatch | null {
   return patch;
 }
 
-function errorResponse(res: express.Response, error: unknown, reportError?: (alert: ErrorAlert) => void, route = '') {
+function errorResponse(res: express.Response, error: unknown, route = '') {
   const code = (error as { code?: unknown } | null)?.code;
   if (code === 'MENU_CATEGORY_MISSING') return res.status(400).json({ error: 'The selected category does not exist.', code: 'INVALID_CATEGORY' });
   if (code === '23505') return res.status(409).json({ error: 'A category with this name already exists.', code: 'DUPLICATE_NAME' });
   if (code === '23503') return res.status(409).json({ error: 'This category is still assigned to one or more products.', code: 'RESOURCE_IN_USE' });
   if (typeof code === 'string' && (code.startsWith('08') || ['ECONNREFUSED', 'ENETUNREACH', 'ETIMEDOUT', '57P01', '57P02', '57P03'].includes(code))) {
-    reportError?.({ source: 'database', summary: 'Database request failed.', route, code });
     return res.status(503).json({ error: 'The menu database is temporarily unavailable.', code: 'DATABASE_UNAVAILABLE' });
   }
   console.error('Menu operation failed (details redacted).', {
     code: typeof code === 'string' ? code : 'UNCLASSIFIED',
     name: error instanceof Error ? error.name : 'UnknownError',
   });
-  reportError?.({ source: 'api', summary: error instanceof Error ? error.name : 'Unknown server error.', route, code: typeof code === 'string' ? code : undefined });
   return res.status(500).json({ error: 'The menu operation could not be completed.', code: 'INTERNAL_ERROR' });
 }
 
-export function createMenuRouter(repository: MenuRepository, requireOwner: RequestHandler, imageStorage?: SupabaseImageStorage, reportError?: (alert: ErrorAlert) => void): express.Router {
+export function createMenuRouter(repository: MenuRepository, requireOwner: RequestHandler, imageStorage?: SupabaseImageStorage): express.Router {
   const api = express.Router();
-  let clientReportCount = 0;
-  let clientReportWindowStartedAt = Date.now();
   api.post('/client-errors', (req, res) => {
     const origin = req.get('origin');
     if (origin) {
@@ -113,14 +108,6 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
       || typeof req.body.route !== 'string' || !req.body.route.startsWith('/') || req.body.route.length > 200 || req.body.route.includes('?')) {
       return invalid(res, 'Error report fields are invalid.');
     }
-    const now = Date.now();
-    if (now - clientReportWindowStartedAt >= 10 * 60 * 1000) {
-      clientReportWindowStartedAt = now;
-      clientReportCount = 0;
-    }
-    if (clientReportCount >= 60) return res.status(429).json({ error: 'Error report limit reached.' });
-    clientReportCount += 1;
-    reportError?.({ source: req.body.source, summary: req.body.message, route: req.body.route });
     return res.status(202).json({ accepted: true });
   });
   api.post('/images', requireOwner, (req, res, next) => {
@@ -140,7 +127,6 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
       return res.status(201).json({ image_url: await imageStorage.upload(req.body, type as Parameters<typeof hasValidImageSignature>[1], purpose) });
     } catch (error) {
       const status = (error as { statusCode?: number })?.statusCode || 502;
-      if (status >= 500) reportError?.({ source: 'image_storage', summary: error instanceof Error ? error.name : 'Image upload failed.', route: req.path, code: String(status) });
       return res.status(status).json({ error: error instanceof Error ? error.message : 'Image upload failed.', code: status === 503 ? 'IMAGE_STORAGE_UNAVAILABLE' : 'IMAGE_UPLOAD_FAILED' });
     }
   });
@@ -156,7 +142,6 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
       await imageStorage.deleteOwnedPublicUrl(url);
       return res.status(204).end();
     } catch (error) {
-      reportError?.({ source: 'image_storage', summary: error instanceof Error ? error.name : 'Image cleanup failed.', route: req.path, code: 'CLEANUP_FAILED' });
       return res.status(502).json({ error: 'Unused image cleanup failed.', code: 'IMAGE_CLEANUP_FAILED' });
     }
   });
@@ -166,7 +151,7 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
       res.set('Cache-Control', 'no-store');
       return res.json(state);
     } catch (error) {
-      return errorResponse(res, error, reportError, req.path);
+      return errorResponse(res, error, req.path);
     }
   });
 
@@ -175,14 +160,14 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
     try {
       await repository.clearAll();
       return res.json({ success: true });
-    } catch (error) { return errorResponse(res, error, reportError, req.path); }
+    } catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.post('/categories', requireOwner, async (req, res) => {
     const input = categoryInput(req.body);
     if (!input) return invalid(res, 'Enter a category name and provide a valid image URL if using one.');
     try { return res.status(201).json({ category: await repository.createCategory(input) }); }
-    catch (error) { return errorResponse(res, error, reportError, req.path); }
+    catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.put('/categories/:id', requireOwner, async (req, res) => {
@@ -199,7 +184,7 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
         } catch { console.error('Replaced category image cleanup failed; old object retained.'); }
       }
       return res.json({ category });
-    } catch (error) { return errorResponse(res, error, reportError, req.path); }
+    } catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.delete('/categories/:id', requireOwner, async (req, res) => {
@@ -213,14 +198,14 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
         } catch { console.error('Deleted category image cleanup failed; old object retained.'); }
       }
       return res.json({ success: true });
-    } catch (error) { return errorResponse(res, error, reportError, req.path); }
+    } catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.post('/products', requireOwner, async (req, res) => {
     const input = productInput(req.body);
     if (!input) return invalid(res, 'Product fields are invalid. Provide a name, category ID, price with at most two decimal places, and valid optional fields.');
     try { return res.status(201).json({ product: await repository.createProduct(input) }); }
-    catch (error) { return errorResponse(res, error, reportError, req.path); }
+    catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.put('/products/:id', requireOwner, async (req, res) => {
@@ -241,7 +226,7 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
         catch { console.error('Replaced product image cleanup failed; old object retained.'); }
       }
       return res.json({ product });
-    } catch (error) { return errorResponse(res, error, reportError, req.path); }
+    } catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.patch('/products/:id/availability', requireOwner, async (req, res) => {
@@ -251,7 +236,7 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
     try {
       const product = await repository.setProductAvailability(req.params.id, req.body.status as ProductStatus);
       return product ? res.json({ product }) : res.status(404).json({ error: 'Product not found.', code: 'NOT_FOUND' });
-    } catch (error) { return errorResponse(res, error, reportError, req.path); }
+    } catch (error) { return errorResponse(res, error, req.path); }
   });
 
   api.delete('/products/:id', requireOwner, async (req, res) => {
@@ -266,7 +251,7 @@ export function createMenuRouter(repository: MenuRepository, requireOwner: Reque
         catch { console.error('Deleted product image cleanup failed; old object retained.'); }
       }
       return res.json({ success: true });
-    } catch (error) { return errorResponse(res, error, reportError, req.path); }
+    } catch (error) { return errorResponse(res, error, req.path); }
   });
   return api;
 }
